@@ -1,0 +1,34 @@
+{
+  "name": "ai-news-delivery",
+  "version": "1.0.0",
+  "description": "AI-powered daily news pipeline — fetch, dedup, filter, summarize, deliver via Telegram",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "start:web": "node src/server.js",
+    "start:worker": "node src/scripts/startPoller.js",
+    "fetch": "node src/index.js"
+  },
+  "keywords": [
+    "ai",
+    "news",
+    "rss",
+    "embeddings",
+    "telegram"
+  ],
+  "license": "ISC",
+  "dependencies": {
+    "@clerk/express": "^2.1.67",
+    "@huggingface/transformers": "^3.4.0",
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.7",
+    "express": "^5.2.1",
+    "mongoose": "^8.9.0",
+    "node-cron": "^4.6.0",
+    "rss-parser": "^3.13.0",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "lighthouse": "^11.7.1"
+  }
+}
