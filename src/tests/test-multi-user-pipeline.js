@@ -9,7 +9,7 @@ const { summarizeRelevantClusters } = require('../services/summarize');
 const { deliverTop5ToTelegram } = require('../services/telegram');
 const config = require('../config');
 
-const USER_1_ID = 'user_3J9Rl5FHP3tYTNadS74NSmjwUZi';
+const USER_1_ID = 'user_3JEbz6SSqzGyAWyPDFRx7wvePp1';
 const USER_2_ID = 'test_user_robotics_982';
 
 async function runMultiUserPipelineTests() {

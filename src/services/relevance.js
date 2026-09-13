@@ -1,4 +1,5 @@
 const { cosineSimilarity } = require('./dedup');
+const config = require('../config');
 
 /**
  * Keyword-based Spam Filter Patterns.
@@ -52,16 +53,20 @@ function checkSpamKeywords(title) {
 /**
  * Calculate relevance and ranking score of an article against a user interest profile.
  *
- * Design Separation:
+ * Design Separation & Candidate Disambiguation:
  * 1. Pass/Fail Gatekeeping (bestRawSimilarity):
  *    - Computes raw cosine similarity against each topic.
- *    - Identifies best matching topic based purely on content similarity (no weight penalty).
- *    - Best raw similarity determines whether article passes RAW_SIMILARITY_THRESHOLD.
+ *    - Evaluates the absolute maximum unweighted similarity across all topics.
+ *    - bestRawSimilarity >= RAW_SIMILARITY_THRESHOLD determines whether article passes admission.
+ *    - Decoupled from weights to prevent low-weight niche topics from being locked out.
  *
- * 2. Priority Ranking (rankingScore):
- *    - rankingScore = bestRawSimilarity * bestTopic.weight
- *    - Used strictly for ordering/prioritizing passing articles in the digest (Steps 3 & 4),
- *      not for gatekeeping admission.
+ * 2. Topic Matching & Priority Ranking (matchedTopic & rankingScore):
+ *    - Among candidate topics that cross the admission threshold (rawSim >= RAW_SIMILARITY_THRESHOLD),
+ *      selects the candidate that maximizes weightedScore (rawSim * weight).
+ *    - Resolves topic-mismatch anomalies where naive argmax(rawSim) assigned articles
+ *      to low-weight catch-all topics (e.g. 0.472 raw, w=0.6) despite higher-priority topics
+ *      being equally strong matches (e.g. 0.469 raw, w=1.0).
+ *    - If no topic passes the admission threshold, falls back to the highest raw similarity topic.
  *
  * @param {Array<number>} articleEmbedding - 384-dimensional article vector
  * @param {Array<Object>} topics - Array of { topic: string, weight: number, embedding: number[] }
@@ -77,28 +82,56 @@ function scoreRelevance(articleEmbedding, topics) {
     };
   }
 
+  const threshold = config.RAW_SIMILARITY_THRESHOLD || 0.45;
   let highestRawSim = -Infinity;
-  let bestTopicObj = null;
+  let highestRawTopic = null;
 
+  const scoredTopics = [];
   for (const t of topics) {
     if (!t.embedding || t.embedding.length === 0) continue;
 
     const rawSim = cosineSimilarity(articleEmbedding, t.embedding);
     if (rawSim > highestRawSim) {
       highestRawSim = rawSim;
-      bestTopicObj = t;
+      highestRawTopic = t;
     }
+    scoredTopics.push({
+      topic: t.topic,
+      weight: t.weight,
+      rawSim: rawSim > 0 ? rawSim : 0,
+      weightedScore: (rawSim > 0 ? rawSim : 0) * t.weight,
+    });
   }
 
   const effectiveRawSim = highestRawSim > 0 ? highestRawSim : 0;
-  const weight = bestTopicObj ? bestTopicObj.weight : 0;
-  const rankingScore = effectiveRawSim * weight;
+
+  // Evaluate passing candidates
+  const passingCandidates = scoredTopics.filter((st) => st.rawSim >= threshold);
+
+  let bestCandidate = null;
+  if (passingCandidates.length > 0) {
+    // Select passing candidate with highest weightedScore; tie-break on rawSim descending
+    passingCandidates.sort((a, b) => b.weightedScore - a.weightedScore || b.rawSim - a.rawSim);
+    bestCandidate = passingCandidates[0];
+  } else {
+    // Fallback for below-threshold articles
+    bestCandidate = highestRawTopic
+      ? {
+          topic: highestRawTopic.topic,
+          weight: highestRawTopic.weight,
+          rawSim: effectiveRawSim,
+          weightedScore: effectiveRawSim * highestRawTopic.weight,
+        }
+      : null;
+  }
+
+  const rankingScore = bestCandidate ? bestCandidate.weightedScore : 0;
 
   return {
     bestRawSimilarity: effectiveRawSim,
     rankingScore: rankingScore,
     relevanceScore: rankingScore, // Aliased for backwards compatibility
-    matchedTopic: bestTopicObj ? bestTopicObj.topic : null,
+    matchedTopic: bestCandidate ? bestCandidate.topic : null,
   };
 }
 

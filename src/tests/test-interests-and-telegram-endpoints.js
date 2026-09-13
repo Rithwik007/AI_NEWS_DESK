@@ -5,7 +5,7 @@ const { createApp } = require('../api/app');
 const { clerkClient } = require('@clerk/express');
 const { verifyAndLinkTelegramCode } = require('../services/telegramAuth');
 
-const TARGET_CLERK_USER_ID = 'user_3J9Rl5FHP3tYTNadS74NSmjwUZi';
+const TARGET_CLERK_USER_ID = 'user_3JEbz6SSqzGyAWyPDFRx7wvePp1';
 
 async function runTests() {
   console.log('=== MULTI-USER STEP A & B ENDPOINT VERIFICATION SUITE ===\n');

@@ -223,16 +223,19 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 - **How it works**: `groqRotator` deduplicates keys from environment variables. When a request hits HTTP 429, the active key is placed on a temporary cooldown and the request is immediately retried on the next healthy key in the pool (up to N attempts). In `chat.js`, the blocking rate-limit check was removed, enabling unrestricted conversational interaction.
 - **Verification performed**: Tested pool initialization with all 5 keys. Simulated an HTTP 429 rate limit on key slot 1 (`gsk_JrN...gSIU`), verified immediate rotation to slot 2 (`gsk_Wet...BolY`), and confirmed successful completion of subsequent chat query without user-facing errors. All 6 suite tests passed in `test-telegram-chat.js`.
 
+### 2026-09-14 — Step 9: Topic-Mismatch Bug Resolution & Candidate-Weighted Topic Disambiguation
+- **What was built**: Resolved the internal topic-mismatch bug in `src/services/relevance.js` (`scoreRelevance`). Refined seed topic phrasings in `src/scripts/seedInterestProfile.js` to eliminate polysemic keywords (replaced `"shipping with"` in Topic 8 with `"equipped with"`, and expanded Topic 7 to explicitly include `"international AI governance and human rights policy"`). Implemented candidate-weighted evaluation across passing topics (`rawSim >= 0.45`), migrated live MongoDB `InterestProfile` documents, and rescored all `ArticleRelevance` records via `src/scripts/migrateTopicPhrasingAndRescore.js`.
+- **Why**: Previously, `scoreRelevance` assigned `matchedTopic` and `rankingScore` strictly via `argmax(rawSim)` over all topics. This caused two distinct failures: (1) Lexical polysemy in Topic 8 ("features shipping with embedded on-device AI") caused maritime freight shipping articles (*Lloyd's List*) to falsely cross the 0.45 gate and tag as consumer hardware; (2) When an article scored similarly across multiple topics, naive raw argmax mis-tagged articles to low-weight catch-alls (e.g. tagging SWE benchmarking or smarter AI models to VC funding or infrastructure instead of coding agents or LLM releases).
+- **How it works**: Gatekeeping remains decoupled: `bestRawSimilarity = Math.max(...rawSims)` checks if at least one topic reaches `RAW_SIMILARITY_THRESHOLD (0.45)`. For passed articles, topic matching filters candidate topics with `rawSim >= 0.45` and selects the candidate maximizing `weightedScore = rawSim * weight` (with raw similarity tiebreak). If an article falls below admission, it falls back to the top raw match. In MongoDB, 868 `ArticleRelevance` documents were rescored: maritime shipping dropped from 0.4593 to 0.3739 (excluded), Gaganyaan astronaut re-assigned to national security/governance (raw 0.5176), UN human rights AI re-assigned to international governance (raw 0.5976), and Real-SWE correctly prioritized under coding agents (rank 0.5103).
+- **Verification performed**: Verified rejection of maritime shipping (raw 0.3739) and municipal bus management (raw 0.4432). Verified high-confidence matching of UN human rights (raw 0.5976) and Gaganyaan astronaut (raw 0.5176). Verified multi-topic disambiguation on Real-SWE, Ask HN, and memory architecture. Verified `test-telegram-chat.js` (6/6 tests passed) and `test-multi-user-pipeline.js` (all tests passed with per-user topic isolation).
+
 ---
 
 ## 5. Known Limitations & Backlog (Not Yet Resolved)
-1. **Topic Assignment Inaccuracy in `bestRawSimilarity`**:
-   - Occasionally an article is assigned to a `matchedTopic` that is not its natural category (e.g. UN human rights AI assigned to copyright legislation).
-   - *Status*: Open backlog item. Currently mitigated by Step 3's honest summary prompt, which prevents the LLM from misleading the user.
-2. **PWA Service Worker Stale-Cache**:
+1. **PWA Service Worker Stale-Cache**:
    - Service worker caches the application shell. A frontend rebuild on Vercel may require a hard refresh on mobile if cached assets are held.
    - *Status*: Open backlog item for automated cache versioning.
-3. **MongoDB Atlas IP Access**:
+2. **MongoDB Atlas IP Access**:
    - Network access is configured to `0.0.0.0/0` to allow dynamic outbound IPs from Render and Vercel.
    - *Status*: Accepted operational tradeoff for free-tier hosting.
 

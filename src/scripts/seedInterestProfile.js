@@ -42,11 +42,11 @@ const STARTER_TOPICS = [
     weight: 0.6,
   },
   {
-    topic: 'government legislation, copyright infringement lawsuits, training data fair use court cases, national security export controls, and safety governance like EU AI Act and California SB 1047',
+    topic: 'government legislation, international AI governance and human rights policy, copyright infringement lawsuits, training data fair use court cases, national security export controls, and safety governance like EU AI Act and California SB 1047',
     weight: 0.4,
   },
   {
-    topic: 'consumer hardware devices, smartphones, PCs, laptops, wearable gadgets, voice assistants, and operating system features shipping with embedded on-device AI',
+    topic: 'consumer hardware devices, smartphones, PCs, laptops, wearable gadgets, voice assistants, and operating system features equipped with embedded on-device AI',
     weight: 0.3,
   },
 ];

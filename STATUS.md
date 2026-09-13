@@ -12,13 +12,11 @@ Current build status:
 
 ---
 
-## Known Issues — Step 2 Topic Assignment
+## Known Issues — Step 2 Topic Assignment (RESOLVED)
 
-*See [PROJECT_DOCUMENTATION.md Section 5](file:///c:/Rithwik/Projects/AI-news-delivery/PROJECT_DOCUMENTATION.md#5-known-limitations--backlog-not-yet-resolved) for the active backlog.*
-
-`bestRawSimilarity` (unweighted cosine similarity between article embedding and topic embeddings) sometimes selects the **wrong** topic as the top match in the $0.45 - 0.48$ similarity band.
-- **Current containment**: Step 3's calibrated tone generation explicitly instructs Groq LLM not to oversell or force topic links for low-confidence articles. Users are not misled.
-- **Priority**: Low. Tracked in canonical backlog.
+- **Issue**: `bestRawSimilarity` previously selected the wrong topic label in the 0.45 - 0.48 similarity band due to lexical polysemy ("shipping with") and naive raw argmax across topics.
+- **Resolution**: Refined seed topic phrasings in `seedInterestProfile.js`, implemented candidate-weighted topic disambiguation among passing topics in `scoreRelevance`, migrated Atlas `InterestProfile` vectors, and rescored 868 `ArticleRelevance` records. Full details in [PROJECT_DOCUMENTATION.md Step 9](file:///c:/Rithwik/Projects/AI-news-delivery/PROJECT_DOCUMENTATION.md#4-chronological-build-log).
+- **Status**: RESOLVED (2026-09-14).
 
 ---
 
