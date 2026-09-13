@@ -110,7 +110,23 @@ function initScheduler() {
     { timezone: 'Asia/Kolkata' }
   );
 
-  console.log('[Scheduler] Scheduled: Morning (08:00 IST), Evening (18:00 IST), and Watchdog active.');
+  // Daily Maintenance: 12:00 AM IST (prune old chat messages beyond retention window)
+  cron.schedule(
+    '0 0 * * *',
+    async () => {
+      console.log('[Scheduler] 🧹 Running daily chat message pruning (00:00 IST)...');
+      try {
+        const { pruneOldChatMessages } = require('./chat');
+        await pruneOldChatMessages();
+      } catch (err) {
+        console.error('[Scheduler] ✗ Failed to prune old chat messages:', err.message);
+        captureException(err, { tags: { component: 'scheduler', task: 'prune_chat' } });
+      }
+    },
+    { timezone: 'Asia/Kolkata' }
+  );
+
+  console.log('[Scheduler] Scheduled: Morning (08:00 IST), Evening (18:00 IST), Watchdogs, and Midnight Pruning active.');
 }
 
 module.exports = { initScheduler, checkMissedRun };

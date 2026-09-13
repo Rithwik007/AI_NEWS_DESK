@@ -60,6 +60,13 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
   - Sentry Missed Run Watchdog checking at 08:35 IST and 18:35 IST for absent pipeline executions.
   - PostHog product analytics tracking pageviews, user logins, and core interactions.
   - Lightweight `/api/health` endpoint pinged every 10 minutes via cron-job.org to keep Render free-tier dynos awake.
+- **Conversational Telegram Assistant & On-Demand /digest**:
+  - Direct 2-way conversational chat with Groq LPUs (`openai/gpt-oss-20b`).
+  - Context injection: user's last 48 hours of delivered digest articles + recent 20 message turns.
+  - Intelligent answering: uses digest context for story questions, general knowledge for unrelated questions without forcing AI links.
+  - Strict cost safeguard: per-user rate limit (20 msgs/hr).
+  - On-demand `/digest` command resending latest top-5 stories.
+  - Automated 30-day message retention pruning running daily at midnight.
 
 ---
 
@@ -199,6 +206,14 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 - **Why**: Maintaining 3 overlapping living documents led to silent documentation drift (e.g. outdated webhook claims and uncompleted step 6). Consolidation ensures one authoritative reference going forward.
 - **How it works**: Added deprecation notices to `STATUS.md` and `PROJECT_CONTEXT.md` redirecting readers to `PROJECT_DOCUMENTATION.md`. Updated `WORKING_RULES.md` to reference `PROJECT_DOCUMENTATION.md`. Established `PROJECT_DOCUMENTATION.md Section 5` as the sole active backlog.
 - **Verification performed**: Verified consistent split-hosting stack across all docs; confirmed zero conflicting claims across repository files.
+
+---
+
+### 2026-09-14 — Step 7: Telegram Conversational Chat & On-Demand /digest
+- **What was built**: Layered two-way conversational AI chat and an on-demand `/digest` command onto the existing Telegram poller. Added `ChatMessage` model, `src/services/chat.js` service with 48h delivered digest context injection and recent 20-message conversation history, per-user rate limiting (20 msgs/hr), and daily midnight cron for 30-day message pruning.
+- **Why**: Allows users to dive deeper into delivered stories ("tell me more about the Nvidia PAIR story") or ask general technical questions directly inside Telegram without opening a browser or breaking pipeline isolation, while preventing unbounded Groq API costs and DB bloat.
+- **How it works**: Poller checks incoming chat ID against linked `User` records. Unlinked users receive account linking instructions. Linked users sending `/digest` receive their latest delivered batch formatted as a top-5 digest. Linked users sending natural language queries trigger `generateChatResponse()`, which checks hourly message counts, retrieves the user's last 48 hours of delivered articles and last 20 chat turns, builds an adaptive system prompt, queries Groq (`openai/gpt-oss-20b`), and returns the response.
+- **Verification performed**: Executed `src/tests/test-telegram-chat.js` covering 6 test cases: verified article-specific explanation using real delivered context ("AgentsDock IDE"), general trivia without forced AI connections ("Paris, France"), `/digest` command execution and formatting, rate-limit blocking at 20 msgs/hr, `ChatMessage` schema persistence, and unlinked user routing. All 6 tests passed.
 
 ---
 

@@ -1,7 +1,9 @@
 const config = require('../config');
 const BotState = require('../models/BotState');
+const User = require('../models/User');
 const { sendTelegramMessage } = require('./telegram');
 const { verifyAndLinkTelegramCode } = require('./telegramAuth');
+const { generateChatResponse, resendLatestDigest } = require('./chat');
 
 /**
  * KNOWN ARCHITECTURAL LIMITATION (STEP 6 DEPLOYMENT):
@@ -61,7 +63,7 @@ async function processTelegramUpdate(update) {
 
   console.log(`[Telegram Poller] Incoming message from chat ${chatId}: "${text}"`);
 
-  // Check for /start command
+  // 1. Check for /start command (linking flow)
   if (text.startsWith('/start')) {
     const parts = text.split(/\s+/);
     const code = parts[1]; // /start <code>
@@ -80,10 +82,34 @@ async function processTelegramUpdate(update) {
     return { action: 'link_attempt', chatId, code, result };
   }
 
-  // Any other text
-  const helpText = '🤖 Send `/start <CODE>` with your 6-character linking code from the web dashboard to link your account.';
-  await sendTelegramMessage(helpText, chatId);
-  return { action: 'help', chatId };
+  // 2. Identify user linked to this chat ID
+  const user = await User.findOne({ telegramChatId: String(chatId) }).lean();
+
+  if (!user) {
+    const unlinkedHelpText = '🤖 You haven\'t linked your Telegram account to an AI News Desk profile yet.\n\nVisit your web dashboard to generate a 6-character linking code, then send:\n`/start <CODE>` here to link.';
+    try {
+      await sendTelegramMessage(unlinkedHelpText, chatId);
+    } catch (err) {
+      console.warn(`[Telegram Poller] Could not send unlinked help message to chat ${chatId}: ${err.message}`);
+    }
+    return { action: 'unlinked_help', chatId };
+  }
+
+  // 3. Check for /digest on-demand command
+  if (text.toLowerCase() === '/digest') {
+    await resendLatestDigest(user, chatId);
+    return { action: 'resend_digest', chatId, userId: user.clerkUserId };
+  }
+
+  // 4. Conversational chat handling
+  console.log(`[Telegram Poller] Processing conversational message from user "${user.clerkUserId}": "${text}"`);
+  const reply = await generateChatResponse(user, text);
+  try {
+    await sendTelegramMessage(reply, chatId);
+  } catch (err) {
+    console.error(`[Telegram Poller] Failed to send chat reply to chat ${chatId}: ${err.message}`);
+  }
+  return { action: 'chat_reply', chatId, userId: user.clerkUserId, replyLength: reply.length };
 }
 
 /**

@@ -159,6 +159,12 @@ const config = {
   CLERK_PUBLISHABLE_KEY: process.env.CLERK_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
   CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
   PORT: parseInt(process.env.PORT, 10) || 3000,
+
+  // --- Telegram Conversational Chat & Digest Resend ---
+  CHAT_HOURLY_RATE_LIMIT: parseInt(process.env.CHAT_HOURLY_RATE_LIMIT, 10) || 20,
+  CHAT_HISTORY_LIMIT: parseInt(process.env.CHAT_HISTORY_LIMIT, 10) || 20,
+  CHAT_PRUNE_DAYS: parseInt(process.env.CHAT_PRUNE_DAYS, 10) || 30,
+  GROQ_CHAT_MODEL: process.env.GROQ_CHAT_MODEL || process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
 };
 
 // Ensure Clerk SDK finds publishable key if only NEXT_PUBLIC_ is set
