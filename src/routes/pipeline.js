@@ -14,19 +14,20 @@ const { fetchAndDedup } = require('../pipeline/fetchAndDedup');
  * - forceDeliverAll: boolean (optional)
  * - limit: number (optional)
  */
-router.post('/trigger', async (req, res) => {
+router.all('/trigger', async (req, res) => {
   try {
     const configuredSecret = process.env.PIPELINE_SECRET;
     if (configuredSecret) {
-      const incomingSecret = req.headers['x-pipeline-secret'] || req.query.secret;
+      const incomingSecret = req.headers['x-pipeline-secret'] || req.query?.secret;
       if (incomingSecret !== configuredSecret) {
         return res.status(401).json({ error: 'Unauthorized', message: 'Invalid pipeline secret' });
       }
     }
 
-    const runType = req.body.runType || req.query.runType || 'morning';
-    const limit = req.body.limit ? Number(req.body.limit) : undefined;
-    const forceDeliverAll = req.body.forceDeliverAll === true || req.query.forceDeliverAll === 'true';
+    const body = req.body || {};
+    const runType = body.runType || req.query?.runType || 'morning';
+    const limit = body.limit ? Number(body.limit) : (req.query?.limit ? Number(req.query.limit) : undefined);
+    const forceDeliverAll = body.forceDeliverAll === true || req.query?.forceDeliverAll === 'true';
 
     console.log(`[Pipeline API] Manual trigger received (runType: ${runType}, limit: ${limit || 'default'})...`);
 
