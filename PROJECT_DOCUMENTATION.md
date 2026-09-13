@@ -81,10 +81,10 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 
 ## 4. Chronological Build Log
 
-### Date not recorded (prior to initial commit 632fb8b) — Step 1: Ingestion, In-Process Embeddings & Semantic Deduplication
-- **What was built**: Initial news pipeline: RSS fetcher for major AI sources, local embedding generation using `Xenova/all-MiniLM-L6-v2`, and graph-based Union-Find clustering for duplicate detection.
+### Bundled into initial commit 632fb8b (2026-09-12) with no finer-grained git history — Step 1: Ingestion, In-Process Embeddings & Semantic Deduplication
+- **What was built**: Initial news pipeline: RSS fetcher for major AI sources (`src/services/fetchRSS.js`), local embedding generation using `Xenova/all-MiniLM-L6-v2` (`src/services/embeddings.js`), and graph-based Union-Find clustering for duplicate detection (`src/services/dedup.js`).
 - **Why**: AI news is characterized by massive redundancy across syndicated outlets. Deduplicating at ingestion prevents users from receiving duplicate coverage of identical announcements.
-- **How it works**: Articles fetched from feeds have their title and snippet concatenated into a single string, embedded into 384-dimensional vectors, and compared pairwise using cosine similarity. A disjoint-set (Union-Find) algorithm groups articles with similarity $\ge$ `SIMILARITY_THRESHOLD`. The earliest published article is designated `isPrimary: true`.
+- **How it works**: Articles fetched from feeds have their title and snippet concatenated into a single string, embedded into 384-dimensional vectors, and compared pairwise using cosine similarity. A disjoint-set (Union-Find) algorithm with path compression and union-by-rank groups articles with similarity $\ge$ `SIMILARITY_THRESHOLD`. The earliest published article is designated `isPrimary: true`.
 - **Verification performed**:
   - Tested on live dataset of 95 articles (4,465 article pairs).
   - *Threshold Tuning*: Initially set to 0.75. A real-world pair covering a "Jalapeño AI chip" had a similarity of 0.7427 and was missed at 0.75. Retuning threshold to `0.72` successfully merged the pair. The nearest false positive was measured at 0.6860 (two different stories discussing OpenAI security), establishing a clean 3.4% safety margin.
@@ -93,8 +93,8 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 
 ---
 
-### Date not recorded (prior to initial commit 632fb8b) — Step 2: Relevance Filtering & Keyword Spam Shield
-- **What was built**: Semantic relevance scoring against configurable interest profiles, complemented by keyword-based regex filters to strip commercial spam.
+### Bundled into initial commit 632fb8b (2026-09-12) with no finer-grained git history — Step 2: Relevance Filtering & Keyword Spam Shield
+- **What was built**: Semantic relevance scoring against configurable interest profiles, complemented by keyword-based regex filters to strip commercial spam (`src/services/relevance.js`).
 - **Why**: Not all AI news is relevant to technical practitioners; affiliate spam, stock pump pieces, and boilerplate PR distract from substantive breakthroughs.
 - **How it works**: Each user profile defines topics with importance weights (0.0–1.0). Articles must first cross an unweighted `RAW_SIMILARITY_THRESHOLD` (0.45) against at least one topic. Articles that pass are assigned a `rankingScore = bestRawSimilarity * weight` and categorized into confidence tiers (`high` $\ge 0.35$, `moderate` $0.25 - 0.35$, `low` $< 0.25$).
 - **Verification performed**:
@@ -108,18 +108,18 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 
 ---
 
-### Date not recorded (prior to initial commit 632fb8b) — Step 3: Article Selection & Calibrated Groq Summarization
-- **What was built**: Dynamic representative article selection per cluster and Groq LLM integration (`openai/gpt-oss-20b`) producing 2–3 sentence summaries and 1–2 sentence "why read this" rationale.
+### Bundled into initial commit 632fb8b (2026-09-12) with no finer-grained git history — Step 3: Article Selection & Calibrated Groq Summarization
+- **What was built**: Dynamic representative article selection per cluster (`src/services/articleSelection.js`) and Groq LLM integration (`openai/gpt-oss-20b` via `src/services/summarize.js`) producing 2–3 sentence summaries and 1–2 sentence "why read this" rationale.
 - **Why**: The earliest published article in a cluster is not always the best written; primary lab blogs provide higher technical signal than syndicated news. Furthermore, standard LLM prompts tend to oversell borderline news.
-- **How it works**: Clusters are scored by source authority (Tier 1: primary lab blogs = 30 pts; Tier 2: authoritative tech journalism = 15 pts; Tier 3: aggregators = 0 pts). The highest-scoring article is sent to Groq. System prompts adapt based on confidence tier: low-confidence articles are instructed under a strict honesty constraint not to hallucinate connections to the user's focus area.
+- **How it works**: Clusters are scored across snippet length (50%), source authority tier (30%: Tier 1 primary lab blogs = 30 pts, Tier 2 mainstream tech journalism = 15 pts, Tier 3 aggregators = 0 pts), and cleanliness (20%). The highest-scoring article is designated `selectedArticleId` and sent to Groq. System prompts dynamically adjust based on confidence tier: low-confidence articles are instructed under a strict honesty constraint not to hallucinate connections to the user's focus area.
 - **Verification performed**:
   - Evaluated on clusters containing multiple sources. Verified that a DeepMind blog post was selected as cluster representative over a TechCrunch repost, despite TechCrunch publishing first.
   - Tested borderline summaries. An article titled *"The Download: smarter AI in schools, and a robot 'carnival' in Shanghai"* assigned to on-device AI was honestly summarized as a general cultural robotics expo without claiming on-device chip relevance.
 
 ---
 
-### Date not recorded (prior to initial commit 632fb8b) — Step 4: Telegram Delivery & Twice-Daily Scheduling
-- **What was built**: Telegram digest delivery system supporting MarkdownV2 formatting, rate-limited dispatch, twice-daily schedule (08:00 and 18:00 IST), and automated run tracking via `PipelineRun`.
+### Bundled into initial commit 632fb8b (2026-09-12) with no finer-grained git history — Step 4: Telegram Delivery & Twice-Daily Scheduling
+- **What was built**: Telegram digest delivery system (`src/services/telegram.js`) supporting legacy Markdown formatting (`parse_mode: 'Markdown'`, deliberately chosen over MarkdownV2 to avoid escaping dots, dashes, and parens in URLs), rate-limited dispatch, twice-daily schedule (08:00 and 18:00 IST), and automated run tracking via `PipelineRun`.
 - **Why**: Overwhelming users with dozens of articles causes notification fatigue. A curated top-5 format with evening incremental updates delivers high utility.
 - **How it works**: Morning runs select the top 5 highest-ranking articles from the last 24 hours. Evening runs identify the morning run timestamp via `PipelineRun` and select only articles newly fetched after that morning cutoff.
 - **Verification performed**:
@@ -130,8 +130,8 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 
 ---
 
-### Date not recorded (prior to initial commit 632fb8b) — Step 5: Multi-User Architecture & PWA Frontend
-- **What was built**: Complete multi-user decoupling. User authentication via Clerk Google OAuth, `ArticleRelevance` collection separating user-specific scoring from global `Article` records, and React+Vite PWA dashboard.
+### Bundled into initial commit 632fb8b (2026-09-12) with no finer-grained git history — Step 5: Multi-User Architecture & PWA Frontend
+- **What was built**: Complete multi-user decoupling. User authentication via Clerk Google OAuth, `ArticleRelevance` collection separating user-specific scoring from global `Article` records, and React+Vite PWA dashboard (`frontend/`).
 - **Why**: Enable multiple independent users with different interest topics, delivery schedules, and Telegram accounts to share the same backend pipeline.
 - **How it works**: Global news ingestion runs once. The pipeline then iterates over all registered `InterestProfile` records, scoring and persisting `ArticleRelevance` rows per user. Telegram delivery dispatches tailored messages per chat ID.
 - **Verification performed**:
@@ -143,32 +143,46 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 
 ---
 
-### 2026-09-12 (commit 632fb8b) — Step 6A: Split-Hosting Deployment (Render + Vercel)
-- **What was built**: Deployed frontend to Vercel and backend API + worker to Render free tier. Created `startAll.js` to run Express API and persistent Telegram long-poller concurrently.
-- **Why**: Vercel serverless functions cannot support persistent Node processes needed for Telegram long-polling. Render provides persistent Linux dynos.
+### 2026-09-12 (commit 632fb8b) — Step 6A: Consolidated Repo Initialization & Split-Hosting Deployment
+- **What was built**: Consolidated initial repository commit containing all 105 project files across frontend and backend. Configured split-hosting deployment targeting Vercel (frontend) and Render free-tier (backend).
+- **Why**: Initialize version control for deployment. Vercel serverless functions cannot support persistent Node processes needed for Telegram long-polling; Render provides persistent Linux containers.
 - **How it works**: Vercel serves the static React PWA. Render runs a persistent single-dyno container hosting Express, in-process `node-cron`, and the Telegram poller.
 - **Architectural Reversal Documented**: Earlier notes in `STATUS.md` marked a migration from Telegram polling to Webhooks as "mandatory" for production. Once Render's persistent worker was selected, this was reversed: long-polling was kept as-is, avoiding webhook endpoint exposure and SSL setup overhead.
 
 ---
 
-### 2026-09-13 (commits ce57851, 213666e, 98e8a81, 50332db, af568dc) — Step 6B: Production UX Resilience Pass
-- **What was built**: Visual loading states (custom spinners across all views), inline error banners with action-aware retry handlers, 401 session expiry redirect (`/login?expired=1`), strict form validation with 0.0–1.0 weight clamping, offline network banner, and custom editorial 404 page.
-- **Why**: Prevent blank screens, unhandled network failures, and bad user input during real-world usage.
+### 2026-09-13 (commits ce57851, 213666e, 98e8a81) — Step 6B: Free-Tier Process Unification & Pipeline Robustness
+- **What was built**: Unified runner script `src/scripts/startAll.js` (`ce57851`), updated `npm start` default in `package.json` (`98e8a81`), and made manual pipeline trigger endpoint `/api/pipeline/run` robust against empty payloads and HTTP method variance (`213666e`).
+- **Why**: Render's free tier only permits a single free web service. Running web and Telegram poller as separate services would require a paid worker tier. Additionally, manual curl triggers failed when sent as GET without a body.
+- **How it works**: `startAll.js` spawns both Express HTTP server (`src/index.js`) and Telegram poller (`src/scripts/startPoller.js`) in a single Node process. `/api/pipeline/run` now accepts both GET and POST requests and safely defaults empty request bodies.
+- **Verification performed**: Tested unified execution in local terminal and verified simultaneous handling of HTTP health checks and Telegram incoming bot messages.
+
+---
+
+### 2026-09-13 (commits 50332db, af568dc) — Step 6C: Production UX Resilience Pass & Form Validation
+- **What was built**: Comprehensive UX resilience states across React frontend: visual loading spinners, action-aware inline error cards with "Try again" retry handlers, 401 session expiry redirect (`/login?expired=1`), global offline detection banner, editorial 404 page, and 0.00–1.00 weight multiplier slider with topic muting.
+- **Why**: Prevent blank screens, unhandled network disconnects, session confusion, and invalid configuration input during real-world mobile usage.
 - **Verification performed**:
   - Injected 503 errors and network failures in live browser session. Confirmed inline error banners appeared and clicking "Try again" successfully recovered state once connectivity was restored.
-  - Verified weight slider allows 0.00 (topic muting without deletion).
+  - Verified weight slider allows 0.00 (`af568dc` reverted unintended 0.1 floor, enabling users to mute topics without deleting them).
   - Navigated to `/random-missing-page` and confirmed editorial 404 rendered.
 
 ---
 
-### 2026-09-13 (commits 4a5b613, b1631bd, 5f049f4) — Step 6C: Observability, Missed-Run Watchdog & Spam Filter Scale Audit
+### 2026-09-13 (commits 4a5b613, b1631bd, 5f049f4) — Step 6D: Observability, Missed-Run Watchdog & PostHog Telemetry
 - **What was built**: Full-stack Sentry error tracking, PostHog analytics, missed-run watchdog scheduler, and full-scale spam filter re-validation.
-- **Why**: Ensure live pipeline failures are caught automatically rather than discovered via missed digests.
+- **Why**: Ensure live pipeline failures are caught automatically rather than discovered via missed digests, and verify spam filter rules at scale.
 - **Verification performed**:
   - *Spam Filter Audit*: Scanned all 753 primary articles (865 total). 15 spam articles caught, 0 false positives found. Upgraded provisional N=1 status to scale-verified.
   - *Missed-Run Root Cause Investigation*: Confirmed Sept 12 evening run did not fire (0 records in DB) because Render slept without keep-alive. Confirmed Sept 13 evening run fired at 18:00:31 IST (0 articles delivered due to 31-minute window having no qualifying stories).
   - *Watchdog Implementation*: Added cron watchdog at 08:35 and 18:35 IST checking `PipelineRun` for completed execution; dispatches Sentry alert if missing.
   - *Telemetry Verification*: Triggered `GET /api/debug/sentry-test` (verified in Sentry dashboard). Configured `phc_...` key in Vercel and verified PostHog capture.
+
+---
+
+### 2026-09-13 (commit a5b8ca8) — Step 6E: Living Master Project Documentation Creation
+- **What was built**: Master living documentation file `PROJECT_DOCUMENTATION.md` consolidating project overview, full feature list, tech stack rationale, chronological build log, known limitations, operational runbook, and strict maintenance rules.
+- **Why**: Preserve architectural decisions, bug root causes, threshold tuning data, and operational procedures for future development without losing historical context.
 
 ---
 
