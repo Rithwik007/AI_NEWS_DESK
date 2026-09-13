@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
+import { trackEvent } from '../utils/analytics';
 import Spinner from '../components/Spinner';
 
 const BOT_USERNAME = 'ai_news_reader0310_bot';
@@ -66,6 +67,7 @@ export default function TelegramConnect() {
           setStatus(data);
           setTelegramLinked?.(true);
           setShowFlow(false);
+          trackEvent('telegram_linked', { chatId: data.telegramChatId });
           clearInterval(pollTimerRef.current);
         }
       } catch (err) {
@@ -88,6 +90,7 @@ export default function TelegramConnect() {
         throw new Error(data?.message || 'Failed to generate code');
       }
       setCodeData({ code: data.code, expiry: data.expiry });
+      trackEvent('telegram_code_generated');
     } catch (err) {
       setError(err.message || "Couldn't generate code — try again");
     } finally {

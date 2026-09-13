@@ -111,6 +111,8 @@ async function fetchTelegramUpdates(offset = 0, timeout = 25) {
     return data.result || [];
   } catch (err) {
     console.error(`[Telegram Poller] Network error fetching updates: ${err.message}`);
+    const { captureException } = require('./sentry');
+    captureException(err, { tags: { component: 'telegram_poller', action: 'fetch_updates' } });
     return [];
   }
 }
@@ -160,6 +162,8 @@ async function startTelegramPoller(options = {}) {
         await processFn(update);
       } catch (err) {
         console.error(`[Telegram Poller] Error processing update ${update.update_id}: ${err.message}`);
+        const { captureException } = require('./sentry');
+        captureException(err, { tags: { component: 'telegram_poller', update_id: update.update_id } });
       }
     }
 

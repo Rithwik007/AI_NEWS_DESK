@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { apiFetch } from '../utils/api';
+import { trackEvent } from '../utils/analytics';
 import Spinner from '../components/Spinner';
 
 export default function InterestEditor() {
@@ -104,6 +105,7 @@ export default function InterestEditor() {
       setTopics(data.topics || cleanTopics);
       setSavedNotice(true);
       setValidationError(null);
+      trackEvent('interests_saved', { topicCount: cleanTopics.length });
       setTimeout(() => setSavedNotice(false), 2500);
     } catch (err) {
       setError(err.message || "Couldn't save changes — try again");

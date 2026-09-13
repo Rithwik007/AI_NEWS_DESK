@@ -21,6 +21,7 @@
   "dependencies": {
     "@clerk/express": "^2.1.67",
     "@huggingface/transformers": "^3.4.0",
+    "@sentry/node": "^10.74.0",
     "cors": "^2.8.6",
     "dotenv": "^16.4.7",
     "express": "^5.2.1",

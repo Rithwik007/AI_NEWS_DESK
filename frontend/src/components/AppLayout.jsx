@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, useUser, useClerk } from '@clerk/clerk-react';
 import { getAuthToken } from '../utils/auth';
 import { apiFetch } from '../utils/api';
+import { identifyUser, trackPageView, resetAnalytics } from '../utils/analytics';
 import Spinner from './Spinner';
 
 export default function AppLayout() {
@@ -10,11 +11,27 @@ export default function AppLayout() {
   const { user } = useUser();
   const { signOut } = useClerk();
   const navigate = useNavigate();
+  const location = useLocation();
   const [telegramLinked, setTelegramLinked] = useState(false);
   const [syncing, setSyncing] = useState(true);
 
   const devToken = typeof window !== 'undefined' ? localStorage.getItem('dev_auth_token') : null;
   const isAuthenticated = isSignedIn || !!devToken;
+
+  // Track pageviews on location changes
+  useEffect(() => {
+    trackPageView(location.pathname);
+  }, [location.pathname]);
+
+  // Identify authenticated user in PostHog
+  useEffect(() => {
+    if (user?.id) {
+      identifyUser(user.id, {
+        email: user.primaryEmailAddress?.emailAddress,
+        name: user.fullName,
+      });
+    }
+  }, [user]);
 
   useEffect(() => {
     if (isLoaded && !isAuthenticated) {
@@ -122,7 +139,10 @@ export default function AppLayout() {
             {user?.primaryEmailAddress?.emailAddress || user?.fullName || 'Editor'}
           </div>
           <button
-            onClick={() => signOut(() => navigate('/login'))}
+            onClick={() => {
+              resetAnalytics();
+              signOut(() => navigate('/login'));
+            }}
             className="btn-secondary"
             style={{ fontSize: '0.85rem', minHeight: '36px', padding: '0 0.75rem' }}
             id="btn-sign-out"

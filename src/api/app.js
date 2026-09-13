@@ -55,6 +55,15 @@ function createApp() {
     res.json({ status: 'ok', timestamp: new Date() });
   });
 
+  // Sentry debug test endpoint
+  app.get('/api/debug/sentry-test', (req, res, next) => {
+    const { captureMessage, captureException } = require('../services/sentry');
+    captureMessage('[Sentry Test] Manual test message from /api/debug/sentry-test', 'warning');
+    const err = new Error('Sentry Test Error — triggered via /api/debug/sentry-test');
+    captureException(err, { tags: { test: true } });
+    next(err);
+  });
+
   // Serve production frontend build if available
   const path = require('path');
   const fs = require('fs');
@@ -68,6 +77,10 @@ function createApp() {
       next();
     });
   }
+
+  // Sentry Express error-handling middleware
+  const { setupExpressErrorHandler } = require('../services/sentry');
+  setupExpressErrorHandler(app);
 
   return app;
 }

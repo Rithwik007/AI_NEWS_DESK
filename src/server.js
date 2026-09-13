@@ -1,9 +1,11 @@
 const { createApp } = require('./api/app');
 const { connectDB } = require('./db/connect');
 const { initScheduler } = require('./services/scheduler');
+const { initSentry } = require('./services/sentry');
 const config = require('./config');
 
 async function startServer() {
+  initSentry();
   await connectDB();
   initScheduler();
   const app = createApp();

@@ -220,6 +220,27 @@ async function fetchAndDedup(options = {}) {
     console.log(`Articles delivered:              ${deliveryStats.totalArticles || 0}`);
     console.log(`Time elapsed:                    ${elapsed}s`);
     console.log('===========================================\n');
+    return {
+      runType,
+      articlesFetched: articles.length,
+      newArticles: newArticles.length,
+      summarizeStats,
+      deliveryStats,
+      elapsed,
+    };
+  } catch (pipelineErr) {
+    console.error(`[Pipeline] Fatal pipeline error in ${runType} mode:`, pipelineErr.message);
+    const { captureException } = require('../services/sentry');
+    captureException(pipelineErr, {
+      tags: {
+        component: 'pipeline',
+        runType,
+      },
+      extra: {
+        options,
+      },
+    });
+    throw pipelineErr;
   } finally {
     await disconnectDB();
   }
