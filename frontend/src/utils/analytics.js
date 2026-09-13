@@ -23,6 +23,10 @@ export function initPostHog() {
     autocapture: false,      // Keep lightweight, no invasive DOM recording
   });
 
+  if (typeof window !== 'undefined') {
+    window.posthog = posthog;
+  }
+
   isInitialized = true;
   console.log('[PostHog] Frontend analytics initialized successfully.');
 }
