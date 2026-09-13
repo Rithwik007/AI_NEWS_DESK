@@ -217,6 +217,14 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 
 ---
 
+### 2026-09-14 — Step 8: Multi-Key Groq Rotation & Unrestricted Conversational Chat
+- **What was built**: Built `src/services/groqRotator.js` multi-key pool manager supporting 5 concurrent Groq API keys (`GROQ_API_KEY`, `API_2`, `API_3`, `API_4`, `API_5`). Removed the user-facing 20 messages/hour chat rate limit in `src/services/chat.js`. Integrated `groqRotator` into both `chat.js` and `summarize.js` for automatic 429 failover.
+- **Why**: Expanding to 5 Groq keys allows 5x throughput (150 RPM aggregate on free tier). Instead of artificially throttling users with an hourly message ceiling, multi-key rotation solves rate-limiting at the infrastructure level with zero user interruption.
+- **How it works**: `groqRotator` deduplicates keys from environment variables. When a request hits HTTP 429, the active key is placed on a temporary cooldown and the request is immediately retried on the next healthy key in the pool (up to N attempts). In `chat.js`, the blocking rate-limit check was removed, enabling unrestricted conversational interaction.
+- **Verification performed**: Tested pool initialization with all 5 keys. Simulated an HTTP 429 rate limit on key slot 1 (`gsk_JrN...gSIU`), verified immediate rotation to slot 2 (`gsk_Wet...BolY`), and confirmed successful completion of subsequent chat query without user-facing errors. All 6 suite tests passed in `test-telegram-chat.js`.
+
+---
+
 ## 5. Known Limitations & Backlog (Not Yet Resolved)
 1. **Topic Assignment Inaccuracy in `bestRawSimilarity`**:
    - Occasionally an article is assigned to a `matchedTopic` that is not its natural category (e.g. UN human rights AI assigned to copyright legislation).

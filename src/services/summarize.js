@@ -1,5 +1,6 @@
 const config = require('../config');
 const { selectBestArticleForSummary } = require('./articleSelection');
+const groqRotator = require('./groqRotator');
 
 /**
  * Sleep helper for rate limiting and backoff.
@@ -133,34 +134,7 @@ Output JSON format:
     });
   }
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.GROQ_API_KEY}`,
-    },
-    body: JSON.stringify(requestBody),
-  });
-
-  // Handle rate limits (HTTP 429)
-  if (response.status === 429) {
-    const retryAfterHeader = response.headers.get('retry-after');
-    const parsedWait = retryAfterHeader ? parseFloat(retryAfterHeader) * 1000 : 3000;
-    const waitTimeMs = Math.max(parsedWait, (retryCount + 1) * 3000);
-    console.warn(`[Groq] Rate limit hit (429). Waiting ${waitTimeMs}ms before retry ${retryCount + 1}...`);
-    await sleep(waitTimeMs);
-    if (retryCount < 4) {
-      return callGroqSummarize({ title, snippet, source, matchedTopic }, retryCount + 1);
-    }
-    throw new Error('Groq rate limit exceeded after retries');
-  }
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Groq API error HTTP ${response.status}: ${errText}`);
-  }
-
-  const data = await response.json();
+  const data = await groqRotator.callChatCompletion(requestBody);
   const rawContent = data.choices?.[0]?.message?.content;
   const parsed = parseJsonSafe(rawContent);
 

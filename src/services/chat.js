@@ -3,28 +3,7 @@ const ChatMessage = require('../models/ChatMessage');
 const Article = require('../models/Article');
 const ArticleRelevance = require('../models/ArticleRelevance');
 const { sendTelegramMessage, formatArticleEntry } = require('./telegram');
-
-/**
- * Check if user has exceeded the hourly chat message limit.
- *
- * @param {string} userId - clerkUserId
- * @returns {Promise<{ allowed: boolean, count: number, limit: number }>}
- */
-async function checkChatRateLimit(userId) {
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-  const count = await ChatMessage.countDocuments({
-    userId,
-    role: 'user',
-    createdAt: { $gte: oneHourAgo },
-  });
-
-  const limit = config.CHAT_HOURLY_RATE_LIMIT || 20;
-  return {
-    allowed: count < limit,
-    count,
-    limit,
-  };
-}
+const groqRotator = require('./groqRotator');
 
 /**
  * Fetch recent chat history for a user, sorted in chronological order.
@@ -128,7 +107,7 @@ URL: ${url}`;
 }
 
 /**
- * Handle conversational user message via Groq with digest context injection.
+ * Handle conversational user message via Groq with digest context injection and multi-key rotation.
  *
  * @param {Object} user - User document { clerkUserId, telegramChatId }
  * @param {string} userText - Incoming user text
@@ -138,14 +117,7 @@ async function generateChatResponse(user, userText) {
   const userId = user.clerkUserId;
   const chatId = user.telegramChatId;
 
-  // 1. Enforce rate limit
-  const rateLimit = await checkChatRateLimit(userId);
-  if (!rateLimit.allowed) {
-    console.warn(`[Chat] Rate limit exceeded for user "${userId}" (${rateLimit.count}/${rateLimit.limit} msgs/hr).`);
-    return `⏳ You've hit the hourly chat limit (${rateLimit.limit} messages/hour). Please try again in a bit!`;
-  }
-
-  // 2. Persist user message to ChatMessage collection
+  // 1. Persist user message to ChatMessage collection
   const userMsgDoc = await ChatMessage.create({
     userId,
     telegramChatId: String(chatId),
@@ -153,11 +125,11 @@ async function generateChatResponse(user, userText) {
     content: userText,
   });
 
-  // 3. Retrieve conversation history & recent digest context
+  // 2. Retrieve conversation history & recent digest context
   const history = await getRecentChatHistory(userId, config.CHAT_HISTORY_LIMIT, userMsgDoc._id);
   const digestContext = await getRecentDigestArticles(userId, 48);
 
-  // 4. Construct prompt
+  // 3. Construct prompt
   const systemPrompt = `You are a knowledgeable, concise, and helpful personal AI assistant for this user's AI news bot.
 You have access to the user's recently delivered digest articles (provided below).
 
@@ -176,32 +148,19 @@ INSTRUCTIONS:
     { role: 'user', content: userText },
   ];
 
-  // 5. Call Groq API
-  if (!config.GROQ_API_KEY) {
-    throw new Error('GROQ_API_KEY is not configured');
-  }
-
+  // 4. Call Groq API via key rotator (handles 429 failover automatically across key pool)
   let assistantReply = '';
   try {
     const groqModel = config.GROQ_CHAT_MODEL || config.GROQ_MODEL || 'openai/gpt-oss-20b';
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: groqModel,
-        messages,
-        temperature: 0.5,
-        max_tokens: 1024,
-      }),
+    const data = await groqRotator.callChatCompletion({
+      model: groqModel,
+      messages,
+      temperature: 0.5,
+      max_tokens: 1024,
     });
 
-    const data = await response.json();
-    if (!response.ok || !data.choices?.[0]?.message?.content) {
-      const errMsg = data.error?.message || response.statusText;
-      throw new Error(`Groq chat API error: ${errMsg}`);
+    if (!data.choices?.[0]?.message?.content) {
+      throw new Error('Groq returned empty response');
     }
 
     assistantReply = data.choices[0].message.content.trim();
@@ -210,7 +169,7 @@ INSTRUCTIONS:
     assistantReply = "I'm having trouble connecting to the inference engine right now. Please try again in a moment.";
   }
 
-  // 6. Persist assistant reply
+  // 5. Persist assistant reply
   await ChatMessage.create({
     userId,
     telegramChatId: String(chatId),
@@ -302,7 +261,6 @@ async function pruneOldChatMessages(maxAgeDays = config.CHAT_PRUNE_DAYS || 30) {
 }
 
 module.exports = {
-  checkChatRateLimit,
   getRecentChatHistory,
   getRecentDigestArticles,
   generateChatResponse,

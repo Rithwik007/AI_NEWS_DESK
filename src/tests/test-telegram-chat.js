@@ -5,7 +5,6 @@ const ArticleRelevance = require('../models/ArticleRelevance');
 const ChatMessage = require('../models/ChatMessage');
 const { processTelegramUpdate } = require('../services/telegramPoller');
 const {
-  checkChatRateLimit,
   generateChatResponse,
   resendLatestDigest,
   getRecentChatHistory,
@@ -121,43 +120,34 @@ async function runTests() {
   }
 
   // -------------------------------------------------------------
-  // TEST CASE 4: Rate limit enforcement (max 20 msgs/hr)
+  // TEST CASE 4: Multi-Key Groq Rotation & Unrestricted Chat
   // -------------------------------------------------------------
-  console.log('--- TEST 4: Rate limit enforcement ---');
-  const currentCount = await ChatMessage.countDocuments({
-    userId: linkedUser.clerkUserId,
-    role: 'user',
-  });
-  console.log(`[Test 4] Current user message count: ${currentCount}`);
+  console.log('--- TEST 4: Groq API key rotation & unblocked chat ---');
+  const groqRotator = require('../services/groqRotator');
+  const activeKeys = groqRotator.getActiveKeyCount();
+  console.log(`[Test 4] Active Groq API key pool count: ${activeKeys}`);
 
-  // Insert synthetic user messages to reach limit (20)
-  const needed = 20 - currentCount;
-  if (needed > 0) {
-    const batch = [];
-    for (let i = 0; i < needed; i++) {
-      batch.push({
-        userId: linkedUser.clerkUserId,
-        telegramChatId: linkedUser.telegramChatId,
-        role: 'user',
-        content: `Synthetic test message ${i + 1}`,
-        createdAt: new Date(),
-      });
-    }
-    await ChatMessage.insertMany(batch);
-    console.log(`[Test 4] Inserted ${needed} synthetic messages to reach 20 limit.`);
-  }
+  const initialKey = groqRotator.getCurrentKey();
+  console.log(`[Test 4] Initial active key: ${groqRotator.maskKey(initialKey)}`);
 
-  const rateLimitStatus = await checkChatRateLimit(linkedUser.clerkUserId);
-  console.log(`[Test 4] Rate limit check:`, rateLimitStatus);
+  // Simulate rate-limit trigger on current key to verify seamless rotation
+  groqRotator.markKeyRateLimited(initialKey, 10000);
+  const rotatedKey = groqRotator.getCurrentKey();
+  console.log(`[Test 4] Rotated active key after 429: ${groqRotator.maskKey(rotatedKey)}`);
 
-  const blockedResponse = await generateChatResponse(linkedUser, 'This message should exceed the rate limit!');
-  console.log(`[Test 4] Bot response on 21st message:\n${blockedResponse}\n`);
+  // Verify chat continues seamlessly past 20 messages without any hourly block
+  const unblockedQuery = "Can you give me a 1-sentence tip for debugging distributed systems?";
+  const unblockedResponse = await generateChatResponse(linkedUser, unblockedQuery);
+  console.log(`[Test 4] Chat response under rotated key:\n${unblockedResponse}\n`);
 
-  if (!rateLimitStatus.allowed && blockedResponse.includes('hit the hourly chat limit')) {
-    console.log('✓ TEST 4 PASSED: Correctly blocked 21st message and returned rate limit notice.\n');
+  const rotationWorked = activeKeys >= 2 && initialKey !== rotatedKey;
+  const chatAllowed = unblockedResponse && !unblockedResponse.includes('hit the hourly chat limit');
+
+  if (rotationWorked && chatAllowed) {
+    console.log('✓ TEST 4 PASSED: Multi-key rotation verified across pool. Chat restriction successfully removed.\n');
     testPassed++;
   } else {
-    console.error('✗ TEST 4 FAILED: Rate limit was not enforced.\n');
+    console.error(`✗ TEST 4 FAILED: rotationWorked=${rotationWorked}, chatAllowed=${chatAllowed}\n`);
     testFailed++;
   }
 

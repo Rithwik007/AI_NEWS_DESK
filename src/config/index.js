@@ -136,8 +136,20 @@ const config = {
   // Embedding model — small, fast, 384-dim vectors, ~23MB ONNX download
   EMBEDDING_MODEL: 'Xenova/all-MiniLM-L6-v2',
 
-  // --- Groq Summarization (Step 3) ---
-  GROQ_API_KEY: process.env.GROQ_API_KEY,
+  // --- Groq Summarization & Conversational Chat ---
+  // Collect all available Groq API keys for automatic failover and rotation
+  GROQ_API_KEYS: [
+    process.env.GROQ_API_KEY,
+    process.env.API_2,
+    process.env.API_3,
+    process.env.API_4,
+    process.env.API_5,
+    process.env.GROQ_API_KEY_2,
+    process.env.GROQ_API_KEY_3,
+    process.env.GROQ_API_KEY_4,
+    process.env.GROQ_API_KEY_5,
+  ].filter(Boolean),
+  GROQ_API_KEY: process.env.GROQ_API_KEY || process.env.API_2 || '',
   // openai/gpt-oss-20b selected for speed (~1000ms latency), native JSON mode, and high accuracy
   GROQ_MODEL: process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
   // Delay between Groq API calls to stay within free-tier 30 RPM limit
