@@ -17,39 +17,40 @@ export default function TelegramConnect() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [showFlow, setShowFlow] = useState(false);
+  const [lastAction, setLastAction] = useState('check'); // 'check' | 'generate'
 
   const pollTimerRef = useRef(null);
 
-  // Check initial link status on page load
-  useEffect(() => {
-    let isMounted = true;
-
-    async function checkStatus() {
-      try {
-        const data = await apiFetch('/api/telegram/status', {}, getToken);
-        if (isMounted && data) {
-          setStatus(data);
-          if (data.linked) {
-            setTelegramLinked?.(true);
-            setShowFlow(false);
-          } else {
-            setShowFlow(true);
-          }
+  // Check initial link status on page load or retry
+  const checkStatus = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setLastAction('check');
+    try {
+      const data = await apiFetch('/api/telegram/status', {}, getToken);
+      if (data) {
+        setStatus(data);
+        if (data.linked) {
+          setTelegramLinked?.(true);
+          setShowFlow(false);
+        } else {
+          setShowFlow(true);
         }
-      } catch (err) {
-        if (isMounted) setError(err.message || 'Failed to check Telegram connection status');
-      } finally {
-        if (isMounted) setLoading(false);
       }
+    } catch (err) {
+      setError(err.message || 'Failed to check Telegram connection status');
+    } finally {
+      setLoading(false);
     }
+  }, [getToken, setTelegramLinked]);
 
+  useEffect(() => {
     checkStatus();
 
     return () => {
-      isMounted = false;
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     };
-  }, [getToken, setTelegramLinked]);
+  }, [checkStatus]);
 
   // Polling loop while waiting for link confirmation
   useEffect(() => {
@@ -80,6 +81,7 @@ export default function TelegramConnect() {
   async function handleGenerateCode() {
     setGenerating(true);
     setError(null);
+    setLastAction('generate');
     try {
       const data = await apiFetch('/api/telegram/link-code', { method: 'POST' }, getToken);
       if (!data || !data.success) {
@@ -163,7 +165,11 @@ export default function TelegramConnect() {
       {error && (
         <div className="error-banner" role="alert" id="telegram-error-banner">
           <span className="error-banner-text">{error}</span>
-          <button onClick={handleGenerateCode} className="btn-retry" id="btn-retry-telegram">
+          <button
+            onClick={lastAction === 'generate' ? handleGenerateCode : checkStatus}
+            className="btn-retry"
+            id="btn-retry-telegram"
+          >
             Try again
           </button>
         </div>

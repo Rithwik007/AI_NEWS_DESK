@@ -13,10 +13,13 @@ export default function InterestEditor() {
   const [error, setError] = useState(null);
   const [validationError, setValidationError] = useState(null);
 
+  const [lastAction, setLastAction] = useState('load');
+
   // Load existing topics
   const loadInterests = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setLastAction('load');
     try {
       const data = await apiFetch('/api/interests', {}, getToken);
       if (data && Array.isArray(data.topics)) {
@@ -42,8 +45,8 @@ export default function InterestEditor() {
 
   function handleWeightChange(index, value) {
     const parsed = parseFloat(value);
-    // Clamp between 0.1 and 1.0
-    const clamped = Math.max(0.1, Math.min(1.0, isNaN(parsed) ? 0.5 : parsed));
+    // Clamp between 0.0 and 1.0 (0 allows muting topic without deletion)
+    const clamped = Math.max(0.0, Math.min(1.0, isNaN(parsed) ? 0.5 : parsed));
     const updated = [...topics];
     updated[index].weight = clamped;
     setTopics(updated);
@@ -63,6 +66,7 @@ export default function InterestEditor() {
   async function handleSaveChanges() {
     setError(null);
     setSavedNotice(false);
+    setLastAction('save');
 
     // Validation 1: At least 1 topic required
     if (topics.length === 0) {
@@ -79,10 +83,13 @@ export default function InterestEditor() {
 
     setSaving(true);
     try {
-      const cleanTopics = topics.map((t) => ({
-        topic: t.topic.trim(),
-        weight: Math.max(0.1, Math.min(1.0, Number(t.weight) || 0.5)),
-      }));
+      const cleanTopics = topics.map((t) => {
+        const num = Number(t.weight);
+        return {
+          topic: t.topic.trim(),
+          weight: Math.max(0.0, Math.min(1.0, isNaN(num) ? 0.5 : num)),
+        };
+      });
 
       const data = await apiFetch(
         '/api/interests',
@@ -135,7 +142,11 @@ export default function InterestEditor() {
       {error && (
         <div className="error-banner" role="alert" id="interest-error-banner">
           <span className="error-banner-text">{error}</span>
-          <button onClick={loadInterests} className="btn-retry" id="btn-retry-interests">
+          <button
+            onClick={lastAction === 'save' ? handleSaveChanges : loadInterests}
+            className="btn-retry"
+            id="btn-retry-interests"
+          >
             Try again
           </button>
         </div>
@@ -213,7 +224,7 @@ export default function InterestEditor() {
                   <span className="slider-label">Weight multiplier:</span>
                   <input
                     type="range"
-                    min="0.1"
+                    min="0.0"
                     max="1.0"
                     step="0.05"
                     value={t.weight}
