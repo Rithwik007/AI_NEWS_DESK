@@ -4,7 +4,7 @@
   "description": "AI-powered daily news pipeline — fetch, dedup, filter, summarize, deliver via Telegram",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node src/scripts/startAll.js",
     "start:web": "node src/server.js",
     "start:worker": "node src/scripts/startPoller.js",
     "start:all": "node src/scripts/startAll.js",
