@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth, useUser, useClerk } from '@clerk/clerk-react';
 import { getAuthToken } from '../utils/auth';
-import { apiUrl } from '../utils/api';
+import { apiFetch } from '../utils/api';
+import Spinner from './Spinner';
 
 export default function AppLayout() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
@@ -10,6 +11,7 @@ export default function AppLayout() {
   const { signOut } = useClerk();
   const navigate = useNavigate();
   const [telegramLinked, setTelegramLinked] = useState(false);
+  const [syncing, setSyncing] = useState(true);
 
   const devToken = typeof window !== 'undefined' ? localStorage.getItem('dev_auth_token') : null;
   const isAuthenticated = isSignedIn || !!devToken;
@@ -23,26 +25,20 @@ export default function AppLayout() {
     if (isAuthenticated) {
       // Sync user and check telegram status
       async function syncAndCheck() {
+        setSyncing(true);
         try {
-          const token = await getAuthToken(getToken);
-          if (!token) return;
-
           // Call /api/auth/sync
-          await fetch(apiUrl('/api/auth/sync'), {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          await apiFetch('/api/auth/sync', { method: 'POST' }, getToken);
 
           // Check Telegram status
-          const statusRes = await fetch(apiUrl('/api/telegram/status'), {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          const statusData = await statusRes.json();
+          const statusData = await apiFetch('/api/telegram/status', {}, getToken);
           if (statusData && statusData.linked) {
             setTelegramLinked(true);
           }
         } catch (err) {
           console.error('[AppLayout] Sync error:', err);
+        } finally {
+          setSyncing(false);
         }
       }
 
@@ -50,12 +46,29 @@ export default function AppLayout() {
     }
   }, [isLoaded, isAuthenticated, getToken, navigate]);
 
-  if (isLoaded && !isAuthenticated) {
+  if (!isLoaded || (isAuthenticated && syncing)) {
     return (
-      <div style={{ padding: '3rem', fontFamily: 'var(--font-body)', color: 'var(--color-slate)' }}>
-        Loading news desk...
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          gap: '1rem',
+          backgroundColor: 'var(--color-paper)',
+        }}
+      >
+        <Spinner size="lg" />
+        <div style={{ fontFamily: 'var(--font-body)', color: 'var(--color-slate)', fontSize: '0.95rem' }}>
+          Initializing news desk...
+        </div>
       </div>
     );
+  }
+
+  if (isLoaded && !isAuthenticated) {
+    return null;
   }
 
   return (

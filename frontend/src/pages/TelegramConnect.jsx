@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { getAuthToken } from '../utils/auth';
-import { apiUrl } from '../utils/api';
+import { apiFetch } from '../utils/api';
+import Spinner from '../components/Spinner';
 
 const BOT_USERNAME = 'ai_news_reader0310_bot';
 
 export default function TelegramConnect() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
-  const { telegramLinked, setTelegramLinked } = useOutletContext() || {};
+  const { setTelegramLinked } = useOutletContext() || {};
 
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ linked: false, telegramChatId: null, linkedAt: null });
@@ -26,14 +26,7 @@ export default function TelegramConnect() {
 
     async function checkStatus() {
       try {
-        const token = await getAuthToken(getToken);
-        if (!token) return;
-
-        const res = await fetch(apiUrl('/api/telegram/status'), {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-
+        const data = await apiFetch('/api/telegram/status', {}, getToken);
         if (isMounted && data) {
           setStatus(data);
           if (data.linked) {
@@ -44,7 +37,7 @@ export default function TelegramConnect() {
           }
         }
       } catch (err) {
-        if (isMounted) setError('Failed to check Telegram connection status');
+        if (isMounted) setError(err.message || 'Failed to check Telegram connection status');
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -67,14 +60,7 @@ export default function TelegramConnect() {
 
     pollTimerRef.current = setInterval(async () => {
       try {
-        const token = await getAuthToken(getToken);
-        if (!token) return;
-
-        const res = await fetch(apiUrl('/api/telegram/status'), {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-
+        const data = await apiFetch('/api/telegram/status', {}, getToken);
         if (data && data.linked) {
           setStatus(data);
           setTelegramLinked?.(true);
@@ -95,25 +81,28 @@ export default function TelegramConnect() {
     setGenerating(true);
     setError(null);
     try {
-      const token = await getAuthToken(getToken);
-      const res = await fetch(apiUrl('/api/telegram/link-code'), {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Failed to generate code');
+      const data = await apiFetch('/api/telegram/link-code', { method: 'POST' }, getToken);
+      if (!data || !data.success) {
+        throw new Error(data?.message || 'Failed to generate code');
       }
       setCodeData({ code: data.code, expiry: data.expiry });
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Couldn't generate code — try again");
     } finally {
       setGenerating(false);
     }
   }
 
   if (loading) {
-    return <p className="text-slate">Checking connection status...</p>;
+    return (
+      <div style={{ maxWidth: '640px' }}>
+        <h1>Telegram Channel</h1>
+        <div className="loading-container" id="telegram-loading-container">
+          <Spinner size="md" />
+          <span>Checking connection status...</span>
+        </div>
+      </div>
+    );
   }
 
   // State A: Already Connected State (or newly confirmed)
@@ -172,18 +161,11 @@ export default function TelegramConnect() {
       </p>
 
       {error && (
-        <div
-          style={{
-            margin: '1.5rem 0',
-            padding: '0.85rem 1rem',
-            backgroundColor: '#FBEBE8',
-            border: '1px solid #E8B4AC',
-            borderRadius: '4px',
-            color: '#9C382A',
-            fontSize: '0.95rem',
-          }}
-        >
-          {error}
+        <div className="error-banner" role="alert" id="telegram-error-banner">
+          <span className="error-banner-text">{error}</span>
+          <button onClick={handleGenerateCode} className="btn-retry" id="btn-retry-telegram">
+            Try again
+          </button>
         </div>
       )}
 
@@ -202,7 +184,14 @@ export default function TelegramConnect() {
                 className="btn-primary btn-full-mobile"
                 id="btn-generate-code"
               >
-                {generating ? 'Generating...' : 'Generate code'}
+                {generating ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Spinner size="sm" style={{ borderTopColor: '#FFFFFF' }} />
+                    Generating...
+                  </span>
+                ) : (
+                  'Generate code'
+                )}
               </button>
             ) : (
               <div>
@@ -278,11 +267,21 @@ export default function TelegramConnect() {
                   Continue
                 </button>
               </div>
+            ) : codeData ? (
+              <div id="telegram-polling-container">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <span className="pulse-dot" />
+                  <span style={{ color: 'var(--color-ink)', fontWeight: 500 }}>
+                    Waiting for message from Telegram...
+                  </span>
+                </div>
+                <p className="text-slate" style={{ fontSize: '0.85rem', marginTop: '0.35rem' }}>
+                  Actively listening for /start {codeData.code} (checking every 3s)
+                </p>
+              </div>
             ) : (
               <p className="text-slate">
-                {codeData
-                  ? 'Waiting for message from Telegram...'
-                  : 'Complete steps 1 and 2 to confirm connection.'}
+                Complete steps 1 and 2 to confirm connection.
               </p>
             )}
           </div>

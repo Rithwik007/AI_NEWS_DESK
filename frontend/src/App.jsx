@@ -3,11 +3,13 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ClerkProvider } from '@clerk/clerk-react';
 
 import AppLayout from './components/AppLayout';
+import OfflineBanner from './components/OfflineBanner';
 import Login from './pages/Login';
 import SignUpPage from './pages/SignUpPage';
 import DigestSchedule from './pages/DigestSchedule';
 import TelegramConnect from './pages/TelegramConnect';
 import InterestEditor from './pages/InterestEditor';
+import NotFound from './pages/NotFound';
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
@@ -19,6 +21,7 @@ export default function App() {
       signUpUrl="/sign-up"
       fallbackRedirectUrl="/login"
     >
+      <OfflineBanner />
       <BrowserRouter>
         <Routes>
           <Route path="/login/*" element={<Login />} />
@@ -31,7 +34,7 @@ export default function App() {
             <Route path="telegram" element={<TelegramConnect />} />
           </Route>
 
-          <Route path="*" element={<Navigate to="/digest" replace />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
     </ClerkProvider>
