@@ -6,7 +6,6 @@ Automated, personalized AI-news curation pipeline delivering deduplicated, relev
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/atlas)
 [![Telegram](https://img.shields.io/badge/Telegram-Bot%20API-26A5E4?logo=telegram&logoColor=white)](https://core.telegram.org/bots)
-[![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
 
 ---
 
@@ -174,6 +173,6 @@ Actively running in daily production for verified users. Built with an emphasis 
 
 ---
 
-## License
+## Author
 
-This project is licensed under the [ISC License](LICENSE).
+Created by **Rithwik Racharla**.
