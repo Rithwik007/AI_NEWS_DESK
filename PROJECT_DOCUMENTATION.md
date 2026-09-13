@@ -186,6 +186,14 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 
 ---
 
+### 2026-09-14 — Step 6F: Public Repository Documentation & GitHub README Creation
+- **What was built**: Root `README.md` featuring shields.io badges, live dashboard links, concise pipeline explanation, key feature highlights, Mermaid architecture diagram, tech stack table, 4 core engineering decision callouts, and clean local setup runbook.
+- **Why**: Present a technical, confident, and professional overview of the repository for public review, recruiters, and developers without exposing raw API endpoints or embellishing capabilities.
+- **How it works**: Synthesized verified architectural patterns, exact threshold figures (0.72 dedup, 0.45 raw similarity), and operational parameters directly from `PROJECT_DOCUMENTATION.md` and codebase.
+- **Verification performed**: Cross-checked all claims, package dependencies, environment variable names, and ISC license against `package.json`, `src/config/index.js`, and `frontend/vite.config.js`.
+
+---
+
 ## 5. Known Limitations & Backlog (Not Yet Resolved)
 1. **Topic Assignment Inaccuracy in `bestRawSimilarity`**:
    - Occasionally an article is assigned to a `matchedTopic` that is not its natural category (e.g. UN human rights AI assigned to copyright legislation).
