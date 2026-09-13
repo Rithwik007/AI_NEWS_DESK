@@ -1,15 +1,16 @@
 # AI News Delivery Pipeline — Project Context
 
-> **PIN THIS**: Reference this file at the start of every task in this project.
+> **DEPRECATED**: This document is preserved for historical sprint context only. [PROJECT_DOCUMENTATION.md](file:///c:/Rithwik/Projects/AI-news-delivery/PROJECT_DOCUMENTATION.md) is now the **single canonical source of truth** for all project context, architecture, stack, and rules.
 
-## What We're Building
+## What We Built
 
 AI-powered daily news pipeline:
-1. Fetches AI-related news from multiple RSS sources
-2. Deduplicates articles covering the same story (embedding clustering)
-3. Filters by relevance to user's interest profile (embedding similarity)
-4. Generates summary + "why you should read this" reason (Groq LLM)
-5. Delivers digest via Telegram
+1. Fetches AI-related news from 15 technical RSS/API sources
+2. Deduplicates articles covering the same story (in-process ONNX embeddings + Union-Find)
+3. Filters by relevance to user's interest profile (decoupled unweighted admission gate)
+4. Generates summary + calibrated "why you should read this" reason (Groq LLM)
+5. Delivers digests via Telegram twice daily (08:00 & 18:00 IST)
+6. Self-serve React 18 PWA dashboard with Clerk Google OAuth
 
 ## NOT a RAG System
 
@@ -21,36 +22,25 @@ NOT for retrieval-grounded QA. No vector DB for long-term retrieval. No chunking
 
 ## Stack
 
-| Component    | Technology                                      |
-| ------------ | ----------------------------------------------- |
-| Backend      | Node.js + Express                               |
-| Database     | MongoDB (Atlas)                                 |
-| LLM          | Groq API (summaries + reasoning only, NOT embeddings) |
-| Embeddings   | transformers.js (in-process Node, NOT Python)   |
-| Delivery     | Telegram Bot API                                |
-| Deployment   | Vercel + Vercel Cron                            |
-| VCS          | GitHub                                          |
+| Component    | Technology                                                                                                    |
+| ------------ | ------------------------------------------------------------------------------------------------------------- |
+| Backend      | Node.js + Express (Render persistent container)                                                               |
+| Database     | MongoDB (Atlas)                                                                                               |
+| LLM          | Groq API (`openai/gpt-oss-20b` for summaries + reasoning only, NOT embeddings)                               |
+| Embeddings   | `@huggingface/transformers` (`all-MiniLM-L6-v2` in-process Node, NOT Python)                                   |
+| Delivery     | Telegram Bot API (legacy Markdown mode)                                                                       |
+| Frontend     | React 18 + Vite (PWA hosted on Vercel CDN)                                                                    |
+| Auth         | Clerk (Google OAuth)                                                                                          |
+| Observability| Sentry (full stack) + PostHog (client analytics) + cron-job.org (keep-alive)                                  |
+| Deployment   | Split hosting: Render (backend API + persistent worker + in-process cron) & Vercel (static PWA)               |
+| VCS          | GitHub                                                                                                        |
 
 ## Build Order
 
 1. `[x]` RSS fetch + deduplication via embedding clustering
-2. `[x]` Relevance filtering against hardcoded interest profile (embedding similarity)
-3. `[x]` Summarization + "why read this" via Groq
-4. `[x]` Telegram delivery to single hardcoded chat ID
-5. `[x]` MongoDB multi-user schema, Clerk auth, frontend dashboard
-6. `[ ]` Deploy properly, add Sentry, add PostHog
+2. `[x]` Relevance filtering against interest profile (embedding similarity)
+3. `[x]` Summarization + "why read this" via Groq with calibrated honesty
+4. `[x]` Telegram delivery with twice-daily morning/evening schedules
+5. `[x]` MongoDB multi-user schema, Clerk auth, frontend PWA dashboard
+6. `[x]` Split-hosting deployment (Render + Vercel), Sentry error monitoring, PostHog analytics, missed-run watchdog
 
-## NOT Building Yet
-
-- No frontend (React/Vite — later)
-- No authentication (Clerk — later)
-- No multi-user support (single hardcoded user/config for now)
-- No analytics (PostHog — later)
-- No custom domain/DNS (Cloudflare — later, if at all)
-
-## Rules for Every Task
-
-- Each task prompt is scoped to **exactly one step**
-- Confirm scope understanding before writing code
-- If something requires functionality from a future step → **stop and ask**
-- Do not build ahead of schedule

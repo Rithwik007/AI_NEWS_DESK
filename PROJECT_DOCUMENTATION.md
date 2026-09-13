@@ -194,6 +194,14 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 
 ---
 
+### 2026-09-14 — Step 6G: Documentation Reconciliation & Single-Source Consolidation
+- **What was built**: Reconciled and formally deprecated `STATUS.md` and `PROJECT_CONTEXT.md` to point to `PROJECT_DOCUMENTATION.md` as the single canonical source of truth. Corrected stale records (marked Step 6 complete, updated stack to split-hosting, updated webhook-to-polling reversal).
+- **Why**: Maintaining 3 overlapping living documents led to silent documentation drift (e.g. outdated webhook claims and uncompleted step 6). Consolidation ensures one authoritative reference going forward.
+- **How it works**: Added deprecation notices to `STATUS.md` and `PROJECT_CONTEXT.md` redirecting readers to `PROJECT_DOCUMENTATION.md`. Updated `WORKING_RULES.md` to reference `PROJECT_DOCUMENTATION.md`. Established `PROJECT_DOCUMENTATION.md Section 5` as the sole active backlog.
+- **Verification performed**: Verified consistent split-hosting stack across all docs; confirmed zero conflicting claims across repository files.
+
+---
+
 ## 5. Known Limitations & Backlog (Not Yet Resolved)
 1. **Topic Assignment Inaccuracy in `bestRawSimilarity`**:
    - Occasionally an article is assigned to a `matchedTopic` that is not its natural category (e.g. UN human rights AI assigned to copyright legislation).

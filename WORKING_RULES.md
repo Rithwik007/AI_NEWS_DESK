@@ -1,6 +1,6 @@
 # Working Rules — Pin and Follow Every Task
 
-> **Reference this file alongside PROJECT_CONTEXT.md at the start of every task.**
+> **Reference this file alongside [PROJECT_DOCUMENTATION.md](file:///c:/Rithwik/Projects/AI-news-delivery/PROJECT_DOCUMENTATION.md) at the start of every task.**
 
 ## Scope Discipline
 
