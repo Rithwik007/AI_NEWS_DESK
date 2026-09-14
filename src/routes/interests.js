@@ -36,7 +36,7 @@ router.get('/', requireClerkAuth, async (req, res) => {
     console.error(`[Interests API] Error in GET /api/interests: ${err.message}`);
     return res.status(500).json({
       error: 'InternalServerError',
-      message: 'Failed to fetch interest profile',
+      message: `Failed to fetch interest profile: ${err.message}`,
     });
   }
 });

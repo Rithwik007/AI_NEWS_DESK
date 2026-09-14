@@ -57,7 +57,7 @@ router.get('/status', requireClerkAuth, async (req, res) => {
     console.error(`[Telegram API] Error in /status: ${err.message}`);
     return res.status(500).json({
       error: 'InternalServerError',
-      message: 'Failed to check Telegram linking status',
+      message: `Failed to check Telegram linking status: ${err.message}`,
     });
   }
 });

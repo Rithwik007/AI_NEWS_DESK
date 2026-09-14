@@ -130,16 +130,34 @@ async function sendTelegramMessage(text, chatId = config.TELEGRAM_CHAT_ID) {
     disable_web_page_preview: true, // Clean scannable feed without giant URL previews
   };
 
-  const response = await fetch(endpoint, {
+  let response = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json();
+  let data = await response.json();
   if (!response.ok || !data.ok) {
-    const desc = data.description || (await response.text());
-    throw new Error(`Telegram API error HTTP ${response.status}: ${desc}`);
+    const desc = data.description || '';
+    // Resilient fallback: If Telegram fails entity parsing, retry as plain text so user is never blocked
+    if (desc.includes("can't parse entities")) {
+      console.warn(`[Telegram] Markdown parse error for chat ${chatId}: "${desc}". Retrying as plain text...`);
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          disable_web_page_preview: true,
+        }),
+      });
+      data = await response.json();
+    }
+
+    if (!response.ok || !data.ok) {
+      const finalDesc = data.description || (await response.text());
+      throw new Error(`Telegram API error HTTP ${response.status}: ${finalDesc}`);
+    }
   }
 
   return data;
