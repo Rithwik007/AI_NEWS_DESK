@@ -234,16 +234,39 @@ async function resendLatestDigest(user, chatId) {
   }));
 
   const header = `📰 *Your Latest AI News Digest*\n\n`;
-  const entries = selectedArticles.map((a, i) => formatArticleEntry(a, i + 1)).join('');
-  let messageText = `${header}${entries}`.trim();
 
-  // Telegram character limit protection (4096 chars)
-  if (messageText.length > 4000) {
-    messageText = messageText.slice(0, 3990) + '...';
+  // Build per-article blocks (full text — no truncation) then chunk into ≤3900-char messages
+  const articleBlocks = selectedArticles.map((a, i) => formatArticleEntry(a, i + 1));
+  const MAX_CHUNK = 3900;
+  const chunks = [];
+  let currentBlocks = [];
+  let currentLen = 0;
+  for (const block of articleBlocks) {
+    const extra = currentBlocks.length === 0 ? header.length : 0;
+    if (currentLen + extra + block.length > MAX_CHUNK && currentBlocks.length > 0) {
+      chunks.push(currentBlocks);
+      currentBlocks = [];
+      currentLen = 0;
+    }
+    currentBlocks.push(block);
+    currentLen += block.length;
   }
+  if (currentBlocks.length > 0) chunks.push(currentBlocks);
 
-  await sendTelegramMessage(messageText, chatId);
-  console.log(`[Chat] Resent latest digest to user "${userId}" (${selectedArticles.length} articles).`);
+  const messages = chunks.map((blocks, idx) => {
+    const chunkHeader = idx === 0
+      ? header
+      : `📰 *Your Latest AI News Digest (cont'd ${idx + 1}/${chunks.length})*\n\n`;
+    return `${chunkHeader}${blocks.join('')}`.trim();
+  });
+
+  for (let mi = 0; mi < messages.length; mi++) {
+    await sendTelegramMessage(messages[mi], chatId);
+    if (mi < messages.length - 1) {
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+  console.log(`[Chat] Resent latest digest to user "${userId}" (${selectedArticles.length} articles, ${messages.length} message chunk(s)).`);
   return true;
 }
 

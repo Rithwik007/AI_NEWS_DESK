@@ -1,6 +1,7 @@
 const { startServer } = require('../server');
 const { startTelegramPoller } = require('../services/telegramPoller');
 const { disconnectDB } = require('../db/connect');
+const { registerBotCommands } = require('./registerBotCommands');
 
 /**
  * Unified entrypoint: starts Express API server + persistent Telegram poller
@@ -26,6 +27,9 @@ async function main() {
 
   process.on('SIGINT', () => handleShutdown('SIGINT'));
   process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+
+  // Register Telegram bot commands (/start, /digest) in the "/" menu
+  await registerBotCommands();
 
   // Start persistent Telegram long poller
   try {

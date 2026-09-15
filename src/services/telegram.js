@@ -301,53 +301,56 @@ async function deliverTopStoriesMultiUser(options = {}) {
     const header = runType === 'evening'
       ? (morningCutoff ? `🌆 *Today's Evening AI News — Incremental Top Stories*\n\n` : `🌆 *Today's Evening AI News — Full Digest*\n\n`)
       : `🔥 *Today's Top AI Stories*\n\n`;
-    let entries = selectedArticles.map((a, i) => formatArticleEntry(a, i + 1)).join('');
-    let messageText = `${header}${entries}`.trim();
 
-    // Compact if exceeds limit
-    if (messageText.length > 4000) {
-      const compactEntries = selectedArticles.map((a, i) => {
-        const target = a.selectedArticleId || a;
-        const title = (target.title || a.title || 'Untitled Article').trim();
-        const url = (target.url || a.url || '').trim();
-        const source = (target.source || a.source || '').trim();
-        let summary = (a.summary || '').trim();
-        let whyReadThis = (a.whyReadThis || '').trim();
+    // Build individual article blocks (full text — no truncation)
+    const articleBlocks = selectedArticles.map((a, i) => formatArticleEntry(a, i + 1));
 
-        if (summary.length > 200) {
-          summary = summary.slice(0, 197).replace(/\s+\S*$/, '') + '...';
-        }
-        if (whyReadThis.length > 160) {
-          whyReadThis = whyReadThis.slice(0, 157).replace(/\s+\S*$/, '') + '...';
-        }
-
-        const titleLink = url ? `[${escapeMarkdown(title)}](${safeUrl(url)})` : `*${escapeMarkdown(title)}*`;
-        const sourceTag = source ? ` _(${escapeMarkdown(source)})_` : '';
-
-        let entry = `${i + 1}. ${titleLink}${sourceTag}\n\n`;
-        if (summary) entry += `${escapeMarkdown(summary)}\n\n`;
-        if (whyReadThis) entry += `💡 *Why read this:* ${escapeMarkdown(whyReadThis)}\n\n`;
-        return entry;
-      }).join('');
-
-      messageText = `${header}${compactEntries}`.trim();
+    // Chunk blocks into ≤3900-char messages (leaving room for header on first chunk)
+    const MAX_CHUNK = 3900;
+    const chunks = [];
+    let currentBlocks = [];
+    let currentLen = 0;
+    for (const block of articleBlocks) {
+      const extra = currentBlocks.length === 0 ? header.length : 0;
+      if (currentLen + extra + block.length > MAX_CHUNK && currentBlocks.length > 0) {
+        chunks.push(currentBlocks);
+        currentBlocks = [];
+        currentLen = 0;
+      }
+      currentBlocks.push(block);
+      currentLen += block.length;
     }
+    if (currentBlocks.length > 0) chunks.push(currentBlocks);
+
+    // Build final message strings: first chunk gets the header, subsequent chunks get a continuation label
+    const messages = chunks.map((blocks, idx) => {
+      const chunkHeader = idx === 0
+        ? header
+        : (chunks.length > 1 ? `🔥 *Top AI Stories (cont'd ${idx + 1}/${chunks.length})*\n\n` : header);
+      return `${chunkHeader}${blocks.join('')}`.trim();
+    });
 
     let sendSuccess = false;
 
     if (options.dryRun) {
-      console.log(`[DRY RUN] Would send digest to ${user.telegramChatId} (${selectedArticles.length} articles, ${messageText.length} chars)`);
+      const totalChars = messages.reduce((s, m) => s + m.length, 0);
+      console.log(`[DRY RUN] Would send ${messages.length} message(s) to ${user.telegramChatId} (${selectedArticles.length} articles, ${totalChars} total chars)`);
       totalMessagesSent++;
       totalArticlesDelivered += selectedArticles.length;
       sendSuccess = true;
     } else {
       try {
-        console.log(`[Telegram] Sending digest to ${user.telegramChatId} (${messageText.length} chars)...`);
-        await sendTelegramMessage(messageText, user.telegramChatId);
+        for (let mi = 0; mi < messages.length; mi++) {
+          console.log(`[Telegram] Sending digest chunk ${mi + 1}/${messages.length} to ${user.telegramChatId} (${messages[mi].length} chars)...`);
+          await sendTelegramMessage(messages[mi], user.telegramChatId);
+          if (mi < messages.length - 1) {
+            await new Promise((r) => setTimeout(r, config.TELEGRAM_SEND_DELAY_MS));
+          }
+        }
         totalMessagesSent++;
         totalArticlesDelivered += selectedArticles.length;
         sendSuccess = true;
-        console.log(`[Telegram] ✓ Digest sent successfully to ${user.telegramChatId}.`);
+        console.log(`[Telegram] ✓ Digest sent successfully to ${user.telegramChatId} (${messages.length} message chunk(s)).`);
       } catch (err) {
         console.error(`[Telegram] ✗ Failed to send digest to ${user.telegramChatId}: ${err.message}`);
         errors.push({ userId: user.clerkUserId, chatId: user.telegramChatId, error: err.message });
