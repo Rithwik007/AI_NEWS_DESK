@@ -31,12 +31,27 @@ async function main() {
   // Register Telegram bot commands (/start, /digest) in the "/" menu
   await registerBotCommands();
 
-  // Start persistent Telegram long poller
-  try {
-    await startTelegramPoller({ signal: controller.signal });
-  } catch (err) {
-    console.error('[System] Poller error:', err.message);
+  // Poller supervisor: auto-restart on crash/exit with exponential backoff.
+  // Prevents the "poller silently dead while Express stays up" failure mode.
+  const { captureException } = require('../services/sentry');
+  let restartDelay = 2000; // Start 2s, cap at 60s
+  while (!controller.signal.aborted) {
+    try {
+      console.log('[System] Starting Telegram poller...');
+      await startTelegramPoller({ signal: controller.signal });
+      // If poller exits cleanly (signal aborted), break out
+      if (controller.signal.aborted) break;
+      console.warn('[System] Poller exited unexpectedly without error. Restarting...');
+    } catch (err) {
+      if (controller.signal.aborted) break;
+      console.error(`[System] Poller crashed: ${err.message}. Restarting in ${restartDelay / 1000}s...`);
+      captureException(err, { tags: { component: 'poller_supervisor' } });
+    }
+    // Backoff before restart: 2s → 4s → 8s → ... → 60s
+    await new Promise((r) => setTimeout(r, restartDelay));
+    restartDelay = Math.min(restartDelay * 2, 60000);
   }
+  console.log('[System] Poller supervisor stopped (shutdown signal received).');
 }
 
 if (require.main === module) {
