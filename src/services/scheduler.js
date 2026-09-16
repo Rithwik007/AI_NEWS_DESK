@@ -126,7 +126,26 @@ function initScheduler() {
     { timezone: 'Asia/Kolkata' }
   );
 
-  console.log('[Scheduler] Scheduled: Morning (08:00 IST), Evening (18:00 IST), Watchdogs, and Midnight Pruning active.');
+  // Keep-alive self-ping every 10 minutes.
+  // Render free-tier spins down after 15 min of inactivity — this prevents it.
+  // Without this, the poller dies overnight and the bot goes silent until next HTTP request.
+  const config = require('../config');
+  const SELF_URL = process.env.RENDER_EXTERNAL_URL || config.BACKEND_URL || null;
+  if (SELF_URL) {
+    cron.schedule('*/10 * * * *', async () => {
+      try {
+        const res = await fetch(`${SELF_URL}/api/health`);
+        if (!res.ok) console.warn(`[KeepAlive] Health ping returned ${res.status}`);
+      } catch (err) {
+        console.warn(`[KeepAlive] Self-ping failed: ${err.message}`);
+      }
+    });
+    console.log(`[Scheduler] Keep-alive self-ping active every 10min → ${SELF_URL}/api/health`);
+  } else {
+    console.warn('[Scheduler] Keep-alive disabled — set RENDER_EXTERNAL_URL or BACKEND_URL env var');
+  }
+
+  console.log('[Scheduler] Scheduled: Morning (08:00 IST), Evening (18:00 IST), Watchdogs, Midnight Pruning, and Keep-Alive active.');
 }
 
 module.exports = { initScheduler, checkMissedRun };

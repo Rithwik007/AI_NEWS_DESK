@@ -177,6 +177,10 @@ const config = {
   CHAT_HISTORY_LIMIT: parseInt(process.env.CHAT_HISTORY_LIMIT, 10) || 20,
   CHAT_PRUNE_DAYS: parseInt(process.env.CHAT_PRUNE_DAYS, 10) || 30,
   GROQ_CHAT_MODEL: process.env.GROQ_CHAT_MODEL || process.env.GROQ_MODEL || 'openai/gpt-oss-20b',
+
+  // Backend public URL — used by scheduler keep-alive ping to prevent Render spin-down.
+  // On Render, RENDER_EXTERNAL_URL is auto-injected. Set BACKEND_URL in local .env if needed.
+  BACKEND_URL: process.env.BACKEND_URL || null,
 };
 
 // Ensure Clerk SDK finds publishable key if only NEXT_PUBLIC_ is set
