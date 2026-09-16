@@ -84,10 +84,28 @@ export default function TelegramConnect() {
     setGenerating(true);
     setError(null);
     setLastAction('generate');
-    try {
+
+    const attemptGenerate = async () => {
       const data = await apiFetch('/api/telegram/link-code', { method: 'POST' }, getToken);
       if (!data || !data.success) {
         throw new Error(data?.message || 'Failed to generate code');
+      }
+      return data;
+    };
+
+    try {
+      let data;
+      try {
+        data = await attemptGenerate();
+      } catch (firstErr) {
+        // On server errors (5xx or network), wait 2s and retry once.
+        // Covers Render cold-start window where DB connection isn't ready yet.
+        if (firstErr.status >= 500 || firstErr.isNetwork) {
+          await new Promise((r) => setTimeout(r, 2000));
+          data = await attemptGenerate();
+        } else {
+          throw firstErr;
+        }
       }
       setCodeData({ code: data.code, expiry: data.expiry });
       trackEvent('telegram_code_generated');
