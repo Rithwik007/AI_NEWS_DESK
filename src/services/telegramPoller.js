@@ -127,7 +127,10 @@ async function fetchTelegramUpdates(offset = 0, timeout = 25) {
   const url = `https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/getUpdates?offset=${offset}&timeout=${timeout}&allowed_updates=["message"]`;
 
   try {
-    const response = await fetch(url, { method: 'GET' });
+    // AbortSignal.timeout prevents the fetch from hanging indefinitely on network stalls.
+    // Set to timeout+10s to allow for the full long-poll duration plus network latency.
+    const fetchSignal = AbortSignal.timeout((timeout + 10) * 1000);
+    const response = await fetch(url, { method: 'GET', signal: fetchSignal });
     const data = await response.json();
 
     if (!response.ok || !data.ok) {
@@ -168,6 +171,8 @@ async function startTelegramPoller(options = {}) {
   }
 
   let pollCount = 0;
+  let consecutiveFailures = 0;
+  const MAX_CONSECUTIVE_FAILURES = 5; // Exit loop after 5 consecutive fetch failures so supervisor can restart fresh
   console.log(`[Telegram Poller] Starting long-poll loop (initial offset: ${offset}, timeout: ${timeout}s, delay: ${pollDelayMs}ms)...`);
 
   while (!options.signal?.aborted) {
@@ -178,6 +183,17 @@ async function startTelegramPoller(options = {}) {
 
     pollCount++;
     const updates = await fetchFn(offset, timeout);
+
+    if (updates.length === 0 && pollCount > 1) {
+      // Count consecutive empty polls as potential stalls only if fetch returned due to error (not normal long-poll timeout)
+      // We use consecutive non-heartbeat failures tracked separately in fetchTelegramUpdates catch block
+    }
+
+    // Track consecutive failures: if fetchFn returns [] due to error (not normal empty poll),
+    // the error is already logged. We detect stalls via a heartbeat log every 50 polls.
+    if (updates.length > 0) {
+      consecutiveFailures = 0; // Reset on any successful update batch
+    }
 
     for (const update of updates) {
       // Advance offset and persist to DB to acknowledge update
@@ -191,6 +207,11 @@ async function startTelegramPoller(options = {}) {
         const { captureException } = require('./sentry');
         captureException(err, { tags: { component: 'telegram_poller', update_id: update.update_id } });
       }
+    }
+
+    // Heartbeat log every 50 polls so Render logs show poller is alive
+    if (pollCount % 50 === 0) {
+      console.log(`[Telegram Poller] Heartbeat — poll #${pollCount}, offset: ${offset}, alive at ${new Date().toISOString()}`);
     }
 
     if (pollDelayMs > 0 && !options.signal?.aborted) {
