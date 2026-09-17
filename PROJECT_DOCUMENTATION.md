@@ -245,9 +245,38 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 - **Delivery Schedule**:
   - 08:00 AM IST: Morning run (full rolling 24-hour top-5 digest).
   - 06:00 PM IST: Evening run (incremental digest covering only new articles since morning run).
-- **Keep-Alive**: `cron-job.org` pings `https://ai-news-backend-rmdj.onrender.com/api/health` every 10 minutes to prevent Render free-tier idle sleep.
+- **Keep-Alive**: `cron-job.org` pings `https://ai-news-backend-rmdj.onrender.com/api/health` every 10 minutes to prevent Render free-tier idle sleep. Also: internal self-ping in `scheduler.js` every 10 minutes via `RENDER_EXTERNAL_URL` (auto-injected by Render) as a second layer.
 - **Missed-Run Detection**: Sentry watchdog checks at 08:35 AM and 06:35 PM IST for a missing `PipelineRun` record.
 - **Active Production URLs**:
   - Frontend: `https://ai-news-desk-ecru.vercel.app`
   - Backend: `https://ai-news-backend-rmdj.onrender.com`
 - **Current Live Users**: 2 active accounts verified end-to-end with independent Telegram delivery.
+
+### Poller Resilience — Incident History (2026-09-17)
+
+**Root cause confirmed via live DB evidence (not theory):**
+
+Node's built-in `fetch()` has no default timeout. The Telegram long-poll `getUpdates` call
+(25s Telegram timeout) could hang indefinitely at the TCP layer on Render's network — never
+throwing, never returning. This froze the `while` loop in `startTelegramPoller` silently:
+- Express stayed alive (health check OK, cron-job.org pings succeeded)
+- Supervisor saw no crash (a hang ≠ exception)
+- DB heartbeat fix addressed a separate problem
+- No safeguard existed to detect a stalled `await`
+
+**Evidence**: BotState stuck at `325527287` for 35+ hours. Local long-poll from dev machine
+returned immediately (4.4s) with 0 updates — production poller had the Telegram connection
+locked in a hung state.
+
+**Fix (`d6ac365`)**: `AbortSignal.timeout(35000)` added to `fetchTelegramUpdates` fetch call.
+35s = 25s Telegram timeout + 10s buffer. Stalled fetch now throws `TimeoutError`, caught by
+existing error handler, loop continues immediately on next poll.
+
+**Verification (real-time, not asserted)**:
+- Post-deploy: BotState advanced `325527287 → 325527295` (7 updates processed)
+- DB showed 3 user messages + 3 assistant replies stored at 07:57–07:59 UTC
+- `sendTelegramMessage` confirmed delivering to production chatId
+
+**Two-day window still open** — checkpoints:
+1. Today 18:00–20:00 IST (same window that failed before)
+2. Tomorrow morning (overnight gap test)
