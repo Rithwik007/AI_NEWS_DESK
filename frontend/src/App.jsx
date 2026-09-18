@@ -31,7 +31,8 @@ export default function App() {
             <Route index element={<Navigate to="/digest" replace />} />
             <Route path="digest" element={<DigestSchedule />} />
             <Route path="interests" element={<InterestEditor />} />
-            <Route path="telegram" element={<TelegramConnect />} />
+            <Route path="channels" element={<TelegramConnect />} />
+            <Route path="telegram" element={<Navigate to="/channels" replace />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

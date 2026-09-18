@@ -12,6 +12,7 @@ export default function AppLayout() {
   const { signOut } = useClerk();
   const navigate = useNavigate();
   const location = useLocation();
+  const [deliveryConnected, setDeliveryConnected] = useState(false);
   const [telegramLinked, setTelegramLinked] = useState(false);
   const [syncing, setSyncing] = useState(true);
 
@@ -40,18 +41,24 @@ export default function AppLayout() {
     }
 
     if (isAuthenticated) {
-      // Sync user and check telegram status
+      // Sync user and check delivery channel statuses
       async function syncAndCheck() {
         setSyncing(true);
         try {
           // Call /api/auth/sync
           await apiFetch('/api/auth/sync', { method: 'POST' }, getToken);
 
-          // Check Telegram status
-          const statusData = await apiFetch('/api/telegram/status', {}, getToken);
-          if (statusData && statusData.linked) {
-            setTelegramLinked(true);
-          }
+          // Check Telegram and WhatsApp status
+          const [tgStatus, waStatus] = await Promise.all([
+            apiFetch('/api/telegram/status', {}, getToken).catch(() => null),
+            apiFetch('/api/whatsapp/status', {}, getToken).catch(() => null),
+          ]);
+
+          const isTg = Boolean(tgStatus?.linked);
+          const isWa = Boolean(waStatus?.registered);
+
+          setTelegramLinked(isTg);
+          setDeliveryConnected(isTg || isWa);
         } catch (err) {
           console.error('[AppLayout] Sync error:', err);
         } finally {
@@ -115,12 +122,12 @@ export default function AppLayout() {
           </NavLink>
 
           <NavLink
-            to="/telegram"
-            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
-            id="nav-telegram"
+            to="/channels"
+            className={({ isActive }) => `nav-link ${isActive || location.pathname === '/telegram' ? 'active' : ''}`}
+            id="nav-channels"
           >
-            <span>Telegram</span>
-            {telegramLinked && (
+            <span>Delivery Channels</span>
+            {deliveryConnected && (
               <span
                 style={{
                   width: '6px',
@@ -176,11 +183,11 @@ export default function AppLayout() {
         </NavLink>
 
         <NavLink
-          to="/telegram"
-          className={({ isActive }) => `tab-link ${isActive ? 'active' : ''}`}
-          id="tab-telegram"
+          to="/channels"
+          className={({ isActive }) => `tab-link ${isActive || location.pathname === '/telegram' ? 'active' : ''}`}
+          id="tab-channels"
         >
-          <span>Telegram</span>
+          <span>Channels</span>
         </NavLink>
       </nav>
     </div>
