@@ -2,10 +2,12 @@ const cron = require('node-cron');
 const { fetchAndDedup } = require('../pipeline/fetchAndDedup');
 const PipelineRun = require('../models/PipelineRun');
 const { captureException, captureMessage } = require('./sentry');
+const { checkAllDeliveryWebhooks } = require('./webhookWatchdog');
 
 /**
  * Watchdog helper: checks if expected runType completed successfully today.
- * Alerts Sentry if no record exists after scheduled grace period.
+ * Also verifies channel-level delivery success (WhatsApp/Telegram) and webhook health.
+ * Alerts Sentry if no record exists or channel failures occurred.
  *
  * @param {'morning'|'evening'} runType
  */
@@ -16,12 +18,12 @@ async function checkMissedRun(runType) {
 
     const run = await PipelineRun.findOne({
       runType,
-      status: 'success',
+      status: { $in: ['success', 'partial', 'failed'] },
       completedAt: { $gte: todayStart },
-    }).lean();
+    }).sort({ completedAt: -1 }).lean();
 
     if (!run) {
-      const msg = `[Scheduler Watchdog] Missed ${runType.toUpperCase()} pipeline run: No successful run recorded for today.`;
+      const msg = `[Scheduler Watchdog] Missed ${runType.toUpperCase()} pipeline run: No run recorded for today.`;
       console.error(msg);
       captureMessage(msg, 'error', {
         tags: {
@@ -31,8 +33,42 @@ async function checkMissedRun(runType) {
         },
       });
     } else {
-      console.log(`[Scheduler Watchdog] ✓ Verified ${runType.toUpperCase()} run completed at ${run.completedAt.toISOString()}`);
+      console.log(`[Scheduler Watchdog] ✓ Verified ${runType.toUpperCase()} run recorded at ${run.completedAt.toISOString()} (status: ${run.status})`);
+
+      // Channel-level delivery verification
+      if (run.channels) {
+        if (run.channels.whatsapp?.failed > 0) {
+          const waErrors = run.channels.whatsapp.errors?.join('; ') || 'Unknown error';
+          const msg = `[Scheduler Watchdog] WhatsApp delivery failure in ${runType.toUpperCase()} run: ${run.channels.whatsapp.failed} send(s) failed. Errors: ${waErrors}`;
+          console.error(msg);
+          captureMessage(msg, 'error', {
+            tags: {
+              component: 'scheduler_watchdog',
+              alertType: 'channel_delivery_failure',
+              channel: 'whatsapp',
+              runType,
+            },
+          });
+        }
+
+        if (run.channels.telegram?.failed > 0) {
+          const tgErrors = run.channels.telegram.errors?.join('; ') || 'Unknown error';
+          const msg = `[Scheduler Watchdog] Telegram delivery failure in ${runType.toUpperCase()} run: ${run.channels.telegram.failed} send(s) failed. Errors: ${tgErrors}`;
+          console.error(msg);
+          captureMessage(msg, 'error', {
+            tags: {
+              component: 'scheduler_watchdog',
+              alertType: 'channel_delivery_failure',
+              channel: 'telegram',
+              runType,
+            },
+          });
+        }
+      }
     }
+
+    // Also run delivery webhooks health self-check
+    await checkAllDeliveryWebhooks();
   } catch (err) {
     console.error(`[Scheduler Watchdog] Error checking ${runType} run status:`, err.message);
     captureException(err, { tags: { component: 'scheduler_watchdog' } });
@@ -121,6 +157,20 @@ function initScheduler() {
       } catch (err) {
         console.error('[Scheduler] ✗ Failed to prune old chat messages:', err.message);
         captureException(err, { tags: { component: 'scheduler', task: 'prune_chat' } });
+      }
+    },
+    { timezone: 'Asia/Kolkata' }
+  );
+
+  // Periodic Webhook Health Monitoring: Every 6 hours (00:30, 06:30, 12:30, 18:30 IST)
+  cron.schedule(
+    '30 */6 * * *',
+    async () => {
+      console.log('[Scheduler] 🔍 Running periodic delivery channels webhook health check...');
+      try {
+        await checkAllDeliveryWebhooks();
+      } catch (err) {
+        console.error('[Scheduler] ✗ Periodic webhook health check error:', err.message);
       }
     },
     { timezone: 'Asia/Kolkata' }

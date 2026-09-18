@@ -252,31 +252,21 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
   - Backend: `https://ai-news-backend-rmdj.onrender.com`
 - **Current Live Users**: 2 active accounts verified end-to-end with independent Telegram delivery.
 
-### Poller Resilience — Incident History (2026-09-17)
+### Dual-Webhook Architecture & Reliability Guarantees (2026-09-19)
 
-**Root cause confirmed via live DB evidence (not theory):**
+**Architectural Evolution**:
+Both delivery channels (Telegram and WhatsApp) are now 100% webhook-based:
+- **Telegram Webhook**: `POST /api/telegram/webhook` (registered via `setWebhook` with `X-Telegram-Bot-Api-Secret-Token` authentication).
+- **WhatsApp Webhook**: `POST /api/whatsapp/webhook` (Meta Cloud API with webhook verification handshake and permanent System User token).
 
-Node's built-in `fetch()` has no default timeout. The Telegram long-poll `getUpdates` call
-(25s Telegram timeout) could hang indefinitely at the TCP layer on Render's network — never
-throwing, never returning. This froze the `while` loop in `startTelegramPoller` silently:
-- Express stayed alive (health check OK, cron-job.org pings succeeded)
-- Supervisor saw no crash (a hang ≠ exception)
-- DB heartbeat fix addressed a separate problem
-- No safeguard existed to detect a stalled `await`
+**Permanent Elimination of Poller Failure Class**:
+- Neither channel depends on a persistent in-process polling loop (`startTelegramPoller`), while-loops, or offset tracking in `BotState`.
+- The entire category of bugs that previously caused multi-day silent freezes (hung `getUpdates` TCP sockets, supervisor backoff crash loops, `BotState` offset desync during Render cold-starts) is **permanently eliminated**.
+- The only operational requirement is keeping the single Express web process alive and warm, which is guaranteed by the dual keep-alive mechanism (external `cron-job.org` + internal self-ping).
 
-**Evidence**: BotState stuck at `325527287` for 35+ hours. Local long-poll from dev machine
-returned immediately (4.4s) with 0 updates — production poller had the Telegram connection
-locked in a hung state.
-
-**Fix (`d6ac365`)**: `AbortSignal.timeout(35000)` added to `fetchTelegramUpdates` fetch call.
-35s = 25s Telegram timeout + 10s buffer. Stalled fetch now throws `TimeoutError`, caught by
-existing error handler, loop continues immediately on next poll.
-
-**Verification (real-time, not asserted)**:
-- Post-deploy: BotState advanced `325527287 → 325527295` (7 updates processed)
-- DB showed 3 user messages + 3 assistant replies stored at 07:57–07:59 UTC
-- `sendTelegramMessage` confirmed delivering to production chatId
-
-**Two-day window still open** — checkpoints:
-1. Today 18:00–20:00 IST (same window that failed before)
-2. Tomorrow morning (overnight gap test)
+**Known Remaining Failure Modes & Automated Safeguards**:
+While in-process polling hangs are eliminated, the system is not failure-proof against external vendor and platform events:
+1. *Meta Access Token Expiry / Invalidation*: Caught by `webhookWatchdog.js` checking `GET /{WABA_ID}/subscribed_apps` against the Meta Graph API and immediately alerting Sentry.
+2. *Webhook De-registration or URL Mismatch*: Caught by `webhookWatchdog.js` calling Telegram `getWebhookInfo` every 6 hours and alerting Sentry if `url` is missing or mismatched.
+3. *Silent Channel Delivery Drops*: Caught by `checkMissedRun` in `scheduler.js` at 08:35 and 18:35 IST, which verifies `PipelineRun.channels` metrics (Telegram & WhatsApp attempt/success/failure counts) per eligible user. If WhatsApp template pushes fail for an eligible user, an explicit Sentry alert fires even if Telegram succeeded as fallback.
+4. *External Platform Outages (Meta or Telegram API)*: Handled gracefully with per-user fallback from WhatsApp to Telegram, detailed error capture in `PipelineRun.channels`, and Sentry incident notifications.

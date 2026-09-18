@@ -244,6 +244,10 @@ async function deliverTopStoriesMultiUser(options = {}) {
   let totalArticlesDelivered = 0;
   const errors = [];
   const userDeliveryResults = [];
+  const channelStats = {
+    telegram: { attempted: 0, succeeded: 0, failed: 0, errors: [] },
+    whatsapp: { attempted: 0, succeeded: 0, failed: 0, errors: [] },
+  };
 
   for (const user of users) {
     const channelInfo = user.whatsappPhoneNumber
@@ -344,6 +348,7 @@ async function deliverTopStoriesMultiUser(options = {}) {
     // Delivery Strategy: Send WhatsApp template push only if user registered number AND isWhatsAppEligible.
     // Ineligible users or failed WhatsApp sends fall back to Telegram.
     if (user.whatsappPhoneNumber && user.isWhatsAppEligible) {
+      channelStats.whatsapp.attempted++;
       const todayFormatted = new Date().toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
@@ -356,6 +361,7 @@ async function deliverTopStoriesMultiUser(options = {}) {
         totalArticlesDelivered += selectedArticles.length;
         sendSuccess = true;
         channelDelivered = 'whatsapp';
+        channelStats.whatsapp.succeeded++;
       } else {
         try {
           console.log(`[WhatsApp] Sending push template "daily_digest_ready" to ${user.whatsappPhoneNumber}...`);
@@ -364,8 +370,11 @@ async function deliverTopStoriesMultiUser(options = {}) {
           totalArticlesDelivered += selectedArticles.length;
           sendSuccess = true;
           channelDelivered = 'whatsapp';
+          channelStats.whatsapp.succeeded++;
           console.log(`[WhatsApp] ✓ Digest template sent successfully to ${user.whatsappPhoneNumber}.`);
         } catch (waErr) {
+          channelStats.whatsapp.failed++;
+          channelStats.whatsapp.errors.push(`${user.clerkUserId} (${user.whatsappPhoneNumber}): ${waErr.message}`);
           console.error(`[WhatsApp] ✗ Failed to send template to ${user.whatsappPhoneNumber}: ${waErr.message}`);
           if (user.telegramChatId) {
             console.log(`[WhatsApp] Falling back to Telegram for user "${user.clerkUserId}"...`);
@@ -378,6 +387,7 @@ async function deliverTopStoriesMultiUser(options = {}) {
 
     // Telegram delivery (if WhatsApp not registered or WhatsApp delivery failed)
     if (!sendSuccess && user.telegramChatId) {
+      channelStats.telegram.attempted++;
       if (options.dryRun) {
         const totalChars = messages.reduce((s, m) => s + m.length, 0);
         console.log(`[DRY RUN] Would send ${messages.length} message(s) to ${user.telegramChatId} (${selectedArticles.length} articles, ${totalChars} total chars)`);
@@ -385,6 +395,7 @@ async function deliverTopStoriesMultiUser(options = {}) {
         totalArticlesDelivered += selectedArticles.length;
         sendSuccess = true;
         channelDelivered = 'telegram';
+        channelStats.telegram.succeeded++;
       } else {
         try {
           for (let mi = 0; mi < messages.length; mi++) {
@@ -398,8 +409,11 @@ async function deliverTopStoriesMultiUser(options = {}) {
           totalArticlesDelivered += selectedArticles.length;
           sendSuccess = true;
           channelDelivered = 'telegram';
+          channelStats.telegram.succeeded++;
           console.log(`[Telegram] ✓ Digest sent successfully to ${user.telegramChatId} (${messages.length} message chunk(s)).`);
         } catch (err) {
+          channelStats.telegram.failed++;
+          channelStats.telegram.errors.push(`${user.clerkUserId} (${user.telegramChatId}): ${err.message}`);
           console.error(`[Telegram] ✗ Failed to send digest to ${user.telegramChatId}: ${err.message}`);
           errors.push({ userId: user.clerkUserId, chatId: user.telegramChatId, channel: 'telegram', error: err.message });
         }
@@ -455,6 +469,7 @@ async function deliverTopStoriesMultiUser(options = {}) {
       completedAt: new Date(),
       articlesDeliveredCount: totalArticlesDelivered,
       messagesSent: totalMessagesSent,
+      channels: channelStats,
       error: errors.length > 0 ? errors.map((e) => `${e.userId}: ${e.error}`).join('; ') : null,
     });
   }

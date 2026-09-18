@@ -41,6 +41,20 @@ const pipelineRunSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  channels: {
+    telegram: {
+      attempted: { type: Number, default: 0 },
+      succeeded: { type: Number, default: 0 },
+      failed: { type: Number, default: 0 },
+      errors: [{ type: String }],
+    },
+    whatsapp: {
+      attempted: { type: Number, default: 0 },
+      succeeded: { type: Number, default: 0 },
+      failed: { type: Number, default: 0 },
+      errors: [{ type: String }],
+    },
+  },
 });
 
 // Indexes for fast lookup of last successful run by type
