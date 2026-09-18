@@ -129,6 +129,8 @@ router.get('/webhook', (req, res) => {
   return res.status(403).send('Forbidden');
 });
 
+const mongoose = require('mongoose');
+
 /**
  * POST /api/whatsapp/webhook
  * Receives incoming WhatsApp messages & events from Meta.
@@ -136,6 +138,15 @@ router.get('/webhook', (req, res) => {
 router.post('/webhook', async (req, res) => {
   // Acknowledge receipt to Meta immediately (Meta requires fast 200 response)
   res.status(200).send('EVENT_RECEIVED');
+
+  try {
+    if (mongoose.connection?.readyState === 1) {
+      await mongoose.connection.collection('whatsapp_webhook_logs').insertOne({
+        receivedAt: new Date(),
+        body: req.body,
+      });
+    }
+  } catch (_) {}
 
   try {
     const body = req.body;
@@ -204,6 +215,32 @@ router.post('/webhook', async (req, res) => {
     console.log(`[WhatsApp Webhook] Reply sent to ${from}.`);
   } catch (err) {
     console.error(`[WhatsApp Webhook] Error processing event: ${err.message}`, err);
+    try {
+      if (mongoose.connection?.readyState === 1) {
+        await mongoose.connection.collection('whatsapp_webhook_logs').insertOne({
+          receivedAt: new Date(),
+          error: err.message,
+          stack: err.stack,
+        });
+      }
+    } catch (_) {}
+  }
+});
+
+/**
+ * GET /api/whatsapp/recent-logs
+ * Debug endpoint returning last 10 webhook events received by backend.
+ */
+router.get('/recent-logs', async (req, res) => {
+  try {
+    const logs = await mongoose.connection.collection('whatsapp_webhook_logs')
+      .find({})
+      .sort({ receivedAt: -1 })
+      .limit(10)
+      .toArray();
+    return res.status(200).json({ count: logs.length, logs });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
