@@ -2,9 +2,11 @@ const { createApp } = require('./api/app');
 const { connectDB } = require('./db/connect');
 const { initScheduler } = require('./services/scheduler');
 const { initSentry } = require('./services/sentry');
+const { validateStartupEnv } = require('./utils/validateEnv');
 const config = require('./config');
 
 async function startServer() {
+  validateStartupEnv({ failFast: true });
   initSentry();
   await connectDB();
   initScheduler();
