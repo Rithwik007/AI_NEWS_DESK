@@ -1,4 +1,5 @@
 const config = require('../config');
+const { sendWhatsAppTemplate } = require('./whatsapp');
 
 /**
  * Escape special Markdown (v1) characters in text.
@@ -227,13 +228,17 @@ async function deliverTopStoriesMultiUser(options = {}) {
     }
   }
 
-  // Find all users with a linked Telegram chat ID
-  const userQuery = { telegramChatId: { $ne: null } };
-  if (options.userId) {
-    userQuery.clerkUserId = options.userId;
-  }
+  // Find all users with a linked delivery channel (WhatsApp or Telegram)
+  const userQuery = options.userId
+    ? { clerkUserId: options.userId }
+    : {
+        $or: [
+          { whatsappPhoneNumber: { $ne: null } },
+          { telegramChatId: { $ne: null } },
+        ],
+      };
   const users = await User.find(userQuery).lean();
-  console.log(`[Telegram] Found ${users.length} user(s) with linked Telegram chat ID.`);
+  console.log(`[Delivery] Found ${users.length} user(s) with linked delivery channels (Telegram/WhatsApp).`);
 
   let totalMessagesSent = 0;
   let totalArticlesDelivered = 0;
@@ -241,7 +246,10 @@ async function deliverTopStoriesMultiUser(options = {}) {
   const userDeliveryResults = [];
 
   for (const user of users) {
-    console.log(`\n[Telegram] Processing user "${user.clerkUserId}" (chat ID: ${user.telegramChatId})...`);
+    const channelInfo = user.whatsappPhoneNumber
+      ? `WhatsApp: ${user.whatsappPhoneNumber}${user.telegramChatId ? ` (Telegram: ${user.telegramChatId})` : ''}`
+      : `Telegram: ${user.telegramChatId}`;
+    console.log(`\n[Delivery] Processing user "${user.clerkUserId}" (${channelInfo})...`);
 
     // Query user's eligible ArticleRelevance records
     const relQuery = {
@@ -331,29 +339,70 @@ async function deliverTopStoriesMultiUser(options = {}) {
     });
 
     let sendSuccess = false;
+    let channelDelivered = null;
 
-    if (options.dryRun) {
-      const totalChars = messages.reduce((s, m) => s + m.length, 0);
-      console.log(`[DRY RUN] Would send ${messages.length} message(s) to ${user.telegramChatId} (${selectedArticles.length} articles, ${totalChars} total chars)`);
-      totalMessagesSent++;
-      totalArticlesDelivered += selectedArticles.length;
-      sendSuccess = true;
-    } else {
-      try {
-        for (let mi = 0; mi < messages.length; mi++) {
-          console.log(`[Telegram] Sending digest chunk ${mi + 1}/${messages.length} to ${user.telegramChatId} (${messages[mi].length} chars)...`);
-          await sendTelegramMessage(messages[mi], user.telegramChatId);
-          if (mi < messages.length - 1) {
-            await new Promise((r) => setTimeout(r, config.TELEGRAM_SEND_DELAY_MS));
-          }
-        }
+    // Delivery Strategy: Default to WhatsApp template push if user registered number.
+    // If WhatsApp template send fails or not registered, fall back to Telegram.
+    if (user.whatsappPhoneNumber) {
+      const todayFormatted = new Date().toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+
+      if (options.dryRun) {
+        console.log(`[DRY RUN] Would send WhatsApp template "daily_digest_ready" to ${user.whatsappPhoneNumber} for user "${user.clerkUserId}".`);
         totalMessagesSent++;
         totalArticlesDelivered += selectedArticles.length;
         sendSuccess = true;
-        console.log(`[Telegram] ✓ Digest sent successfully to ${user.telegramChatId} (${messages.length} message chunk(s)).`);
-      } catch (err) {
-        console.error(`[Telegram] ✗ Failed to send digest to ${user.telegramChatId}: ${err.message}`);
-        errors.push({ userId: user.clerkUserId, chatId: user.telegramChatId, error: err.message });
+        channelDelivered = 'whatsapp';
+      } else {
+        try {
+          console.log(`[WhatsApp] Sending push template "daily_digest_ready" to ${user.whatsappPhoneNumber}...`);
+          await sendWhatsAppTemplate(user.whatsappPhoneNumber, 'daily_digest_ready', [todayFormatted]);
+          totalMessagesSent++;
+          totalArticlesDelivered += selectedArticles.length;
+          sendSuccess = true;
+          channelDelivered = 'whatsapp';
+          console.log(`[WhatsApp] ✓ Digest template sent successfully to ${user.whatsappPhoneNumber}.`);
+        } catch (waErr) {
+          console.error(`[WhatsApp] ✗ Failed to send template to ${user.whatsappPhoneNumber}: ${waErr.message}`);
+          if (user.telegramChatId) {
+            console.log(`[WhatsApp] Falling back to Telegram for user "${user.clerkUserId}"...`);
+          } else {
+            errors.push({ userId: user.clerkUserId, phone: user.whatsappPhoneNumber, channel: 'whatsapp', error: waErr.message });
+          }
+        }
+      }
+    }
+
+    // Telegram delivery (if WhatsApp not registered or WhatsApp delivery failed)
+    if (!sendSuccess && user.telegramChatId) {
+      if (options.dryRun) {
+        const totalChars = messages.reduce((s, m) => s + m.length, 0);
+        console.log(`[DRY RUN] Would send ${messages.length} message(s) to ${user.telegramChatId} (${selectedArticles.length} articles, ${totalChars} total chars)`);
+        totalMessagesSent++;
+        totalArticlesDelivered += selectedArticles.length;
+        sendSuccess = true;
+        channelDelivered = 'telegram';
+      } else {
+        try {
+          for (let mi = 0; mi < messages.length; mi++) {
+            console.log(`[Telegram] Sending digest chunk ${mi + 1}/${messages.length} to ${user.telegramChatId} (${messages[mi].length} chars)...`);
+            await sendTelegramMessage(messages[mi], user.telegramChatId);
+            if (mi < messages.length - 1) {
+              await new Promise((r) => setTimeout(r, config.TELEGRAM_SEND_DELAY_MS));
+            }
+          }
+          totalMessagesSent++;
+          totalArticlesDelivered += selectedArticles.length;
+          sendSuccess = true;
+          channelDelivered = 'telegram';
+          console.log(`[Telegram] ✓ Digest sent successfully to ${user.telegramChatId} (${messages.length} message chunk(s)).`);
+        } catch (err) {
+          console.error(`[Telegram] ✗ Failed to send digest to ${user.telegramChatId}: ${err.message}`);
+          errors.push({ userId: user.clerkUserId, chatId: user.telegramChatId, channel: 'telegram', error: err.message });
+        }
       }
     }
 
@@ -378,6 +427,8 @@ async function deliverTopStoriesMultiUser(options = {}) {
     userDeliveryResults.push({
       userId: user.clerkUserId,
       chatId: user.telegramChatId,
+      whatsappPhoneNumber: user.whatsappPhoneNumber,
+      channel: channelDelivered,
       eligibleCount: eligibleRels.length,
       deliveredCount: selectedArticles.length,
       articles: selectedArticles.map((a) => ({

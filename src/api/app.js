@@ -5,6 +5,7 @@ const authRoutes = require('../routes/auth');
 const interestsRoutes = require('../routes/interests');
 const telegramRoutes = require('../routes/telegram');
 const pipelineRoutes = require('../routes/pipeline');
+const whatsappRoutes = require('../routes/whatsapp');
 
 /**
  * Creates and configures the Express API application.
@@ -48,6 +49,7 @@ function createApp() {
   app.use('/api/auth', authRoutes);
   app.use('/api/interests', interestsRoutes);
   app.use('/api/telegram', telegramRoutes);
+  app.use('/api/whatsapp', whatsappRoutes);
   app.use('/api/pipeline', pipelineRoutes);
 
   // Health check endpoint

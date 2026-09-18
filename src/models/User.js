@@ -35,6 +35,15 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  whatsappPhoneNumber: {
+    type: String,
+    default: null,
+    index: true,
+  },
+  whatsappRegisteredAt: {
+    type: Date,
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

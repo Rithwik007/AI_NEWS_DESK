@@ -181,6 +181,13 @@ const config = {
   // Backend public URL — used by scheduler keep-alive ping to prevent Render spin-down.
   // On Render, RENDER_EXTERNAL_URL is auto-injected. Set BACKEND_URL in local .env if needed.
   BACKEND_URL: process.env.BACKEND_URL || null,
+
+  // --- WhatsApp Meta Cloud API ---
+  WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN || null,
+  WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID || null,
+  WHATSAPP_BUSINESS_ACCOUNT_ID: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || null,
+  WEBHOOK_VERIFY_TOKEN: process.env.WEBHOOK_VERIFY_TOKEN || null,
+  WHATSAPP_API_VERSION: process.env.WHATSAPP_API_VERSION || 'v20.0',
 };
 
 // Ensure Clerk SDK finds publishable key if only NEXT_PUBLIC_ is set

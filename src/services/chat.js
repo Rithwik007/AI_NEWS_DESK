@@ -3,6 +3,7 @@ const ChatMessage = require('../models/ChatMessage');
 const Article = require('../models/Article');
 const ArticleRelevance = require('../models/ArticleRelevance');
 const { sendTelegramMessage, formatArticleEntry } = require('./telegram');
+const { sendWhatsAppMessage, formatWhatsAppArticleEntry } = require('./whatsapp');
 const groqRotator = require('./groqRotator');
 
 /**
@@ -109,18 +110,22 @@ URL: ${url}`;
 /**
  * Handle conversational user message via Groq with digest context injection and multi-key rotation.
  *
- * @param {Object} user - User document { clerkUserId, telegramChatId }
+ * @param {Object} user - User document { clerkUserId, telegramChatId, whatsappPhoneNumber }
  * @param {string} userText - Incoming user text
+ * @param {Object} [options]
+ * @param {'telegram'|'whatsapp'} [options.channel='telegram']
+ * @param {string|number} [options.senderId]
  * @returns {Promise<string>} Assistant reply text
  */
-async function generateChatResponse(user, userText) {
+async function generateChatResponse(user, userText, options = {}) {
   const userId = user.clerkUserId;
-  const chatId = user.telegramChatId;
+  const channel = options.channel || 'telegram';
+  const senderId = options.senderId || (channel === 'whatsapp' ? user.whatsappPhoneNumber : user.telegramChatId);
 
   // 1. Persist user message to ChatMessage collection
   const userMsgDoc = await ChatMessage.create({
     userId,
-    telegramChatId: String(chatId),
+    telegramChatId: String(senderId || ''),
     role: 'user',
     content: userText,
   });
@@ -140,7 +145,7 @@ ${digestContext}
 INSTRUCTIONS:
 1. If the user's question relates to one of the provided digest articles, use the factual details from the article (title, publication outlet, summary, why it matters) to give an insightful, accurate answer.
 2. If the user's question does NOT relate to the digest articles, answer normally as a helpful assistant using your general knowledge. Do NOT force connections to AI news or the digest if the user is asking about an unrelated topic (e.g. general trivia, coding help, other news).
-3. Keep answers clear, conversational, and direct for mobile Telegram reading. Avoid unnecessary preamble.`;
+3. Keep answers clear, conversational, and direct for mobile chat reading. Avoid unnecessary preamble.`;
 
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -172,7 +177,7 @@ INSTRUCTIONS:
   // 5. Persist assistant reply
   await ChatMessage.create({
     userId,
-    telegramChatId: String(chatId),
+    telegramChatId: String(senderId || ''),
     role: 'assistant',
     content: assistantReply,
   });
@@ -181,14 +186,18 @@ INSTRUCTIONS:
 }
 
 /**
- * Resend the user's most recently delivered digest on demand.
+ * Resend the user's most recently delivered digest on demand (Telegram or WhatsApp).
  *
  * @param {Object} user - User document
- * @param {string|number} chatId - Telegram chat ID
+ * @param {string|number} targetId - Telegram chat ID or WhatsApp phone number
+ * @param {Object} [options]
+ * @param {'telegram'|'whatsapp'} [options.channel='telegram']
  * @returns {Promise<boolean>} Success status
  */
-async function resendLatestDigest(user, chatId) {
+async function resendLatestDigest(user, targetId, options = {}) {
   const userId = user.clerkUserId;
+  const channel = options.channel || 'telegram';
+  const isWhatsApp = channel === 'whatsapp';
 
   const latestRel = await ArticleRelevance.findOne({
     userId,
@@ -199,7 +208,11 @@ async function resendLatestDigest(user, chatId) {
 
   if (!latestRel || !latestRel.deliveredAt) {
     const emptyMsg = "📭 You haven't received any digests yet! Your first digest will arrive during the scheduled morning (8:00 AM IST) or evening (6:00 PM IST) runs.";
-    await sendTelegramMessage(emptyMsg, chatId);
+    if (isWhatsApp) {
+      await sendWhatsAppMessage(targetId, emptyMsg);
+    } else {
+      await sendTelegramMessage(emptyMsg, targetId);
+    }
     return false;
   }
 
@@ -220,7 +233,11 @@ async function resendLatestDigest(user, chatId) {
 
   if (deliveredRels.length === 0) {
     const emptyMsg = "📭 Could not retrieve your recent digest articles. Please check back after the next scheduled delivery.";
-    await sendTelegramMessage(emptyMsg, chatId);
+    if (isWhatsApp) {
+      await sendWhatsAppMessage(targetId, emptyMsg);
+    } else {
+      await sendTelegramMessage(emptyMsg, targetId);
+    }
     return false;
   }
 
@@ -235,9 +252,11 @@ async function resendLatestDigest(user, chatId) {
 
   const header = `📰 *Your Latest AI News Digest*\n\n`;
 
-  // Build per-article blocks (full text — no truncation) then chunk into ≤3900-char messages
-  const articleBlocks = selectedArticles.map((a, i) => formatArticleEntry(a, i + 1));
-  const MAX_CHUNK = 3900;
+  // Format articles using channel-specific format
+  const articleBlocks = selectedArticles.map((a, i) =>
+    isWhatsApp ? formatWhatsAppArticleEntry(a, i + 1) : formatArticleEntry(a, i + 1)
+  );
+  const MAX_CHUNK = 3800;
   const chunks = [];
   let currentBlocks = [];
   let currentLen = 0;
@@ -261,12 +280,16 @@ async function resendLatestDigest(user, chatId) {
   });
 
   for (let mi = 0; mi < messages.length; mi++) {
-    await sendTelegramMessage(messages[mi], chatId);
+    if (isWhatsApp) {
+      await sendWhatsAppMessage(targetId, messages[mi]);
+    } else {
+      await sendTelegramMessage(messages[mi], targetId);
+    }
     if (mi < messages.length - 1) {
       await new Promise((r) => setTimeout(r, 1000));
     }
   }
-  console.log(`[Chat] Resent latest digest to user "${userId}" (${selectedArticles.length} articles, ${messages.length} message chunk(s)).`);
+  console.log(`[Chat] Resent latest digest to user "${userId}" via ${channel} (${selectedArticles.length} articles, ${messages.length} message chunk(s)).`);
   return true;
 }
 
