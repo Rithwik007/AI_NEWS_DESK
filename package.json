@@ -6,7 +6,6 @@
   "scripts": {
     "start": "node src/scripts/startAll.js",
     "start:web": "node src/server.js",
-    "start:worker": "node src/scripts/startPoller.js",
     "start:all": "node src/scripts/startAll.js",
     "fetch": "node src/index.js"
   },

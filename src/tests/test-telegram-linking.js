@@ -2,7 +2,7 @@ const { connectDB, disconnectDB } = require('../db/connect');
 const User = require('../models/User');
 const config = require('../config');
 const { generateTelegramLinkCode, verifyAndLinkTelegramCode } = require('../services/telegramAuth');
-const { processTelegramUpdate } = require('../services/telegramPoller');
+const { processTelegramUpdate } = require('../services/telegramWebhook');
 
 async function runTests() {
   console.log('=== STEP 5: TELEGRAM USER LINKING TEST SUITE ===\n');

@@ -4,17 +4,7 @@ services:
     env: node
     plan: free
     buildCommand: npm install
-    startCommand: node src/server.js
-    envVars:
-      - key: NODE_ENV
-        value: production
-
-  - type: worker
-    name: ai-news-telegram-poller
-    env: node
-    plan: starter
-    buildCommand: npm install
-    startCommand: node src/scripts/startPoller.js
+    startCommand: node src/scripts/startAll.js
     envVars:
       - key: NODE_ENV
         value: production

@@ -1,23 +1,19 @@
 const { startServer } = require('../server');
-const { startTelegramPoller } = require('../services/telegramPoller');
 const { disconnectDB } = require('../db/connect');
 const { registerBotCommands } = require('./registerBotCommands');
 
 /**
- * Unified entrypoint: starts Express API server + persistent Telegram poller
- * in a single Node process. Ideal for single-instance free tier deployment on Render.
+ * Unified entrypoint: starts Express API server (with scheduler and webhooks)
+ * and registers bot commands. Webhooks handle Telegram & WhatsApp incoming updates.
  */
 async function main() {
-  console.log('[System] Launching unified web + poller service...');
+  console.log('[System] Launching AI News Desk web service (Express + Schedulers + Webhooks)...');
 
   // Start Express API server (connects to DB and initializes scheduler)
   const { app, server } = await startServer();
 
-  const controller = new AbortController();
-
   const handleShutdown = async (signal) => {
     console.log(`\n[System] Received ${signal}. Shutting down services...`);
-    controller.abort();
     if (server) {
       server.close(() => console.log('[System] Express HTTP server closed.'));
     }
@@ -31,27 +27,7 @@ async function main() {
   // Register Telegram bot commands (/start, /digest) in the "/" menu
   await registerBotCommands();
 
-  // Poller supervisor: auto-restart on crash/exit with exponential backoff.
-  // Prevents the "poller silently dead while Express stays up" failure mode.
-  const { captureException } = require('../services/sentry');
-  let restartDelay = 2000; // Start 2s, cap at 60s
-  while (!controller.signal.aborted) {
-    try {
-      console.log('[System] Starting Telegram poller...');
-      await startTelegramPoller({ signal: controller.signal });
-      // If poller exits cleanly (signal aborted), break out
-      if (controller.signal.aborted) break;
-      console.warn('[System] Poller exited unexpectedly without error. Restarting...');
-    } catch (err) {
-      if (controller.signal.aborted) break;
-      console.error(`[System] Poller crashed: ${err.message}. Restarting in ${restartDelay / 1000}s...`);
-      captureException(err, { tags: { component: 'poller_supervisor' } });
-    }
-    // Backoff before restart: 2s → 4s → 8s → ... → 60s
-    await new Promise((r) => setTimeout(r, restartDelay));
-    restartDelay = Math.min(restartDelay * 2, 60000);
-  }
-  console.log('[System] Poller supervisor stopped (shutdown signal received).');
+  console.log('[System] Webhook service is active and listening for incoming updates.');
 }
 
 if (require.main === module) {

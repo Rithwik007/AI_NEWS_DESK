@@ -158,6 +158,7 @@ const config = {
   // --- Telegram Delivery (Step 4) ---
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
   TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID,
+  TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET || null,
   // Delay between message sends to stay within Telegram rate limits
   TELEGRAM_SEND_DELAY_MS: parseInt(process.env.TELEGRAM_SEND_DELAY_MS, 10) || 1500,
   // Delivery mode: 'top5' (default, top 5 high/moderate articles in 1 message) or 'all_tiers' (legacy, all articles grouped by tier)

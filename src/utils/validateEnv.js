@@ -19,6 +19,7 @@ function validateStartupEnv(options = { failFast: true }) {
     { name: 'WHATSAPP_ACCESS_TOKEN', value: config.WHATSAPP_ACCESS_TOKEN, required: true },
     { name: 'WHATSAPP_PHONE_NUMBER_ID', value: config.WHATSAPP_PHONE_NUMBER_ID, required: true },
     { name: 'WHATSAPP_BUSINESS_ACCOUNT_ID', value: config.WHATSAPP_BUSINESS_ACCOUNT_ID, required: true },
+    { name: 'TELEGRAM_WEBHOOK_SECRET', value: config.TELEGRAM_WEBHOOK_SECRET, required: false },
     { name: 'SENTRY_DSN', value: process.env.SENTRY_DSN, required: false },
   ];
 

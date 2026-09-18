@@ -1,8 +1,39 @@
 const express = require('express');
 const router = express.Router();
+const config = require('../config');
 const User = require('../models/User');
 const { requireClerkAuth } = require('../middleware/auth');
 const { generateTelegramLinkCode } = require('../services/telegramAuth');
+const { processTelegramUpdate } = require('../services/telegramWebhook');
+
+/**
+ * POST /api/telegram/webhook
+ * Receives incoming updates from Telegram Webhook.
+ * Acknowledges HTTP 200 immediately, then processes update asynchronously.
+ */
+router.post('/webhook', async (req, res) => {
+  // Validate secret token if TELEGRAM_WEBHOOK_SECRET is configured
+  if (config.TELEGRAM_WEBHOOK_SECRET) {
+    const receivedSecret = req.headers['x-telegram-bot-api-secret-token'];
+    if (receivedSecret !== config.TELEGRAM_WEBHOOK_SECRET) {
+      console.warn('[Telegram Webhook] Unauthorized: X-Telegram-Bot-Api-Secret-Token mismatch');
+      return res.status(403).json({ error: 'Forbidden', message: 'Secret token mismatch' });
+    }
+  }
+
+  // Acknowledge immediately to prevent Telegram retries / timeouts
+  res.status(200).json({ ok: true });
+
+  const update = req.body;
+  if (!update) return;
+
+  try {
+    await processTelegramUpdate(update);
+  } catch (err) {
+    console.error(`[Telegram Webhook] Error processing update: ${err.message}`);
+  }
+});
+
 
 /**
  * POST /api/telegram/link-code

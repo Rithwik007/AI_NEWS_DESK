@@ -3,7 +3,7 @@ const User = require('../models/User');
 const Article = require('../models/Article');
 const ArticleRelevance = require('../models/ArticleRelevance');
 const ChatMessage = require('../models/ChatMessage');
-const { processTelegramUpdate } = require('../services/telegramPoller');
+const { processTelegramUpdate } = require('../services/telegramWebhook');
 const {
   generateChatResponse,
   resendLatestDigest,

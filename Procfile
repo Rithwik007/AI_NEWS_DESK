@@ -1,2 +1,1 @@
-web: node src/server.js
-worker: node src/scripts/startPoller.js
+web: node src/scripts/startAll.js
