@@ -3,7 +3,7 @@ const router = express.Router();
 const User = require('../models/User');
 const config = require('../config');
 const { requireClerkAuth } = require('../middleware/auth');
-const { sendWhatsAppMessage, cleanPhoneNumber } = require('../services/whatsapp');
+const { sendWhatsAppMessage, cleanPhoneNumber, isPhoneAllowed } = require('../services/whatsapp');
 const { generateChatResponse, resendLatestDigest } = require('../services/chat');
 
 /**
@@ -25,6 +25,7 @@ function normalizeToE164(phone) {
 /**
  * POST /api/whatsapp/register-number
  * Protected endpoint to register or update the authenticated user's WhatsApp number.
+ * Evaluates isWhatsAppEligible against WHATSAPP_ALLOWED_NUMBERS.
  */
 router.post('/register-number', requireClerkAuth, async (req, res) => {
   try {
@@ -52,22 +53,32 @@ router.post('/register-number', requireClerkAuth, async (req, res) => {
       });
     }
 
+    // Determine eligibility from allowlist
+    const isEligible = isPhoneAllowed(formattedNumber);
+
     const updatedUser = await User.findOneAndUpdate(
       { clerkUserId },
       {
         $set: {
           whatsappPhoneNumber: formattedNumber,
           whatsappRegisteredAt: new Date(),
+          isWhatsAppEligible: isEligible,
         },
       },
       { new: true, upsert: true }
     );
 
+    const infoMessage = isEligible
+      ? 'WhatsApp delivery activated! You have access to the premium WhatsApp digest.'
+      : "WhatsApp delivery is currently limited to a small invite list — you're all set on Telegram in the meantime.";
+
     return res.status(200).json({
       success: true,
       registered: true,
       phoneNumber: updatedUser.whatsappPhoneNumber,
+      isWhatsAppEligible: updatedUser.isWhatsAppEligible,
       registeredAt: updatedUser.whatsappRegisteredAt,
+      message: infoMessage,
     });
   } catch (err) {
     console.error(`[WhatsApp API] Error in /register-number: ${err.message}`);
@@ -80,7 +91,7 @@ router.post('/register-number', requireClerkAuth, async (req, res) => {
 
 /**
  * GET /api/whatsapp/status
- * Protected endpoint returning whether the user has a registered WhatsApp number.
+ * Protected endpoint returning whether the user has a registered WhatsApp number and their eligibility.
  */
 router.get('/status', requireClerkAuth, async (req, res) => {
   try {
@@ -92,6 +103,7 @@ router.get('/status', requireClerkAuth, async (req, res) => {
         success: true,
         registered: false,
         phoneNumber: null,
+        isWhatsAppEligible: false,
         registeredAt: null,
       });
     }
@@ -100,6 +112,7 @@ router.get('/status', requireClerkAuth, async (req, res) => {
       success: true,
       registered: true,
       phoneNumber: user.whatsappPhoneNumber,
+      isWhatsAppEligible: Boolean(user.isWhatsAppEligible),
       registeredAt: user.whatsappRegisteredAt,
     });
   } catch (err) {

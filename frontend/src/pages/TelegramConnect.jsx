@@ -158,11 +158,12 @@ export default function TelegramConnect() {
         setWaStatus({
           registered: true,
           phoneNumber: data.phoneNumber,
+          isWhatsAppEligible: Boolean(data.isWhatsAppEligible),
           registeredAt: data.registeredAt,
         });
         setWaPhone(data.phoneNumber);
-        setWaSuccess('WhatsApp number saved! You will receive scheduled digest notifications on WhatsApp.');
-        trackEvent('whatsapp_number_registered');
+        setWaSuccess(data.message || 'WhatsApp number saved successfully!');
+        trackEvent('whatsapp_number_registered', { eligible: data.isWhatsAppEligible });
       } else {
         throw new Error(data?.message || 'Failed to register WhatsApp number');
       }
@@ -211,12 +212,45 @@ export default function TelegramConnect() {
               Receive short scheduled template alerts. Reply <strong>digest</strong> for full articles.
             </p>
           </div>
-          <div
-            className={`status-pill ${waStatus.registered ? 'connected' : ''}`}
-            id="whatsapp-status-pill"
-          >
-            <span className="status-indicator-dot" />
-            <span>{waStatus.registered ? 'Connected' : 'Not linked'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {waStatus.registered && waStatus.isWhatsAppEligible && (
+              <span
+                style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  padding: '0.2rem 0.5rem',
+                  borderRadius: '4px',
+                  backgroundColor: 'var(--color-signal)',
+                  color: '#FFFFFF',
+                }}
+              >
+                Premium
+              </span>
+            )}
+            <div
+              className={`status-pill ${waStatus.registered && waStatus.isWhatsAppEligible ? 'connected' : ''}`}
+              id="whatsapp-status-pill"
+            >
+              <span
+                className="status-indicator-dot"
+                style={{
+                  backgroundColor: waStatus.registered
+                    ? waStatus.isWhatsAppEligible
+                      ? 'var(--color-signal)'
+                      : '#D97706'
+                    : 'var(--color-slate)',
+                }}
+              />
+              <span>
+                {!waStatus.registered
+                  ? 'Not linked'
+                  : waStatus.isWhatsAppEligible
+                  ? 'Connected'
+                  : 'Waitlist'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -297,10 +331,26 @@ export default function TelegramConnect() {
           </div>
         </form>
 
-        {waStatus.registered && (
+        {waStatus.registered && waStatus.isWhatsAppEligible && (
           <p className="text-slate" style={{ fontSize: '0.85rem', marginTop: '0.75rem' }}>
-            Registered number: <strong>{waStatus.phoneNumber}</strong>. When a digest arrives, reply with &ldquo;digest&rdquo; or any question.
+            Registered number: <strong>{waStatus.phoneNumber}</strong>. You will receive morning (8:00 AM) &amp; evening (6:00 PM) WhatsApp digest templates.
           </p>
+        )}
+
+        {waStatus.registered && !waStatus.isWhatsAppEligible && (
+          <div
+            style={{
+              marginTop: '1rem',
+              padding: '0.85rem 1rem',
+              backgroundColor: '#FAF9F5',
+              border: '1px solid var(--color-hairline)',
+              borderRadius: '6px',
+              fontSize: '0.9rem',
+              color: 'var(--color-slate)',
+            }}
+          >
+            ℹ️ <strong>WhatsApp Invite List:</strong> WhatsApp delivery is currently limited to a small invite list — you&apos;re all set on Telegram in the meantime.
+          </div>
         )}
       </div>
 

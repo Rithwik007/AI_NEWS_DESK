@@ -44,6 +44,11 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  isWhatsAppEligible: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

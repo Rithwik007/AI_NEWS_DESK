@@ -13,6 +13,21 @@ function cleanPhoneNumber(phone) {
 }
 
 /**
+ * Checks if a phone number matches the WHATSAPP_ALLOWED_NUMBERS allowlist.
+ * Compares normalized digits to prevent formatting mismatches (+ vs no +, spaces, dashes).
+ *
+ * @param {string} phone
+ * @returns {boolean}
+ */
+function isPhoneAllowed(phone) {
+  if (!phone) return false;
+  const clean = cleanPhoneNumber(phone);
+  if (!clean) return false;
+  const allowed = (config.WHATSAPP_ALLOWED_NUMBERS || []).map((n) => cleanPhoneNumber(n));
+  return allowed.includes(clean);
+}
+
+/**
  * Formats single article entry for WhatsApp readability.
  * Note: WhatsApp doesn't support Markdown links [text](url). Raw URLs auto-link.
  *
@@ -200,6 +215,7 @@ async function sendWhatsAppMessage(toPhoneNumber, text) {
 
 module.exports = {
   cleanPhoneNumber,
+  isPhoneAllowed,
   formatWhatsAppArticleEntry,
   chunkWhatsAppText,
   sendWhatsAppTemplate,

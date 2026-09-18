@@ -341,9 +341,9 @@ async function deliverTopStoriesMultiUser(options = {}) {
     let sendSuccess = false;
     let channelDelivered = null;
 
-    // Delivery Strategy: Default to WhatsApp template push if user registered number.
-    // If WhatsApp template send fails or not registered, fall back to Telegram.
-    if (user.whatsappPhoneNumber) {
+    // Delivery Strategy: Send WhatsApp template push only if user registered number AND isWhatsAppEligible.
+    // Ineligible users or failed WhatsApp sends fall back to Telegram.
+    if (user.whatsappPhoneNumber && user.isWhatsAppEligible) {
       const todayFormatted = new Date().toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',

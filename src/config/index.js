@@ -188,6 +188,11 @@ const config = {
   WHATSAPP_BUSINESS_ACCOUNT_ID: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || null,
   WEBHOOK_VERIFY_TOKEN: process.env.WEBHOOK_VERIFY_TOKEN || null,
   WHATSAPP_API_VERSION: process.env.WHATSAPP_API_VERSION || 'v20.0',
+  // Allowlist of phone numbers eligible for WhatsApp delivery (comma-separated or single)
+  WHATSAPP_ALLOWED_NUMBERS: (process.env.WHATSAPP_ALLOWED_NUMBERS || '')
+    .split(',')
+    .map((num) => num.trim())
+    .filter(Boolean),
 };
 
 // Ensure Clerk SDK finds publishable key if only NEXT_PUBLIC_ is set
