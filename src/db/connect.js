@@ -2,42 +2,83 @@ const mongoose = require('mongoose');
 const config = require('../config');
 
 let _reconnecting = false;
+let _connectionPromise = null;
 
 /**
- * Connect to MongoDB Atlas with resilience options.
- * - serverSelectionTimeoutMS: how long to wait to find a usable server before giving up
- * - socketTimeoutMS: how long an idle socket is kept alive before closing
- * - heartbeatFrequencyMS: how often the driver pings the server to detect disconnects
- * - maxPoolSize: keep pool small for free-tier (default 100 is excessive)
- * Mongoose auto-reconnects internally; event listeners log the transitions so
- * we can see Atlas idle-drop events in Render logs.
+ * Connect to MongoDB Atlas with resilient connection settings.
+ * Removes aggressive 45s socketTimeoutMS that previously caused idle socket drops on Render.
+ *
+ * @returns {Promise<mongoose.Connection>}
  */
 async function connectDB() {
-  try {
-    await mongoose.connect(config.MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000,  // Fail fast if Atlas unreachable at startup
-      socketTimeoutMS: 45000,           // Close idle sockets after 45s
-      heartbeatFrequencyMS: 10000,      // Ping Atlas every 10s to detect drops early
-      maxPoolSize: 5,                   // Free-tier: keep pool small
-    });
-    console.log('[DB] Connected to MongoDB Atlas');
-  } catch (error) {
-    console.error('[DB] Failed to connect to MongoDB:', error.message);
-    process.exit(1);
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
   }
 
-  // Monitor connection state transitions — visible in Render logs
-  mongoose.connection.on('disconnected', () => {
-    console.warn('[DB] MongoDB connection lost — Mongoose will attempt reconnect...');
-  });
-  mongoose.connection.on('reconnected', () => {
-    console.log('[DB] MongoDB reconnected successfully.');
-    _reconnecting = false;
-  });
-  mongoose.connection.on('error', (err) => {
-    console.error('[DB] MongoDB connection error:', err.message);
-  });
+  if (_connectionPromise) {
+    return _connectionPromise;
+  }
+
+  _connectionPromise = (async () => {
+    try {
+      await mongoose.connect(config.MONGODB_URI, {
+        serverSelectionTimeoutMS: 10000, // 10s timeout to find Atlas server
+        heartbeatFrequencyMS: 10000,     // Ping Atlas every 10s to keep connection warm
+        maxPoolSize: 10,                 // Up to 10 connections
+        minPoolSize: 1,                  // Keep at least 1 socket alive
+      });
+      console.log('[DB] Connected to MongoDB Atlas (readyState: 1)');
+      return mongoose.connection;
+    } catch (error) {
+      console.error('[DB] Failed to connect to MongoDB:', error.message);
+      throw error;
+    } finally {
+      _connectionPromise = null;
+    }
+  })();
+
+  return _connectionPromise;
 }
+
+/**
+ * Ensures MongoDB is connected before running any database operation.
+ * If connection dropped or in idle state, auto-reconnects on-demand.
+ *
+ * @returns {Promise<void>}
+ */
+async function ensureDBConnected() {
+  if (mongoose.connection.readyState === 1) {
+    return;
+  }
+
+  console.warn(`[DB] Connection not ready (readyState: ${mongoose.connection.readyState}). Reconnecting...`);
+  await connectDB();
+}
+
+// Global connection event handlers for visibility and auto-recovery
+mongoose.connection.on('disconnected', async () => {
+  console.warn('[DB] MongoDB connection lost — scheduling immediate auto-reconnect...');
+  if (!_reconnecting) {
+    _reconnecting = true;
+    try {
+      await connectDB();
+      console.log('[DB] Auto-reconnect succeeded.');
+    } catch (err) {
+      console.error('[DB] Auto-reconnect attempt failed:', err.message);
+    } finally {
+      _reconnecting = false;
+    }
+  }
+});
+
+mongoose.connection.on('reconnected', () => {
+  console.log('[DB] MongoDB reconnected successfully.');
+  _reconnecting = false;
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('[DB] MongoDB connection error:', err.message);
+});
 
 /**
  * Gracefully close MongoDB connection.
@@ -47,5 +88,8 @@ async function disconnectDB() {
   console.log('[DB] Disconnected from MongoDB');
 }
 
-module.exports = { connectDB, disconnectDB };
-
+module.exports = {
+  connectDB,
+  ensureDBConnected,
+  disconnectDB,
+};

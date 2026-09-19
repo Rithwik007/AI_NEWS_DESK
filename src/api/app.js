@@ -45,6 +45,24 @@ function createApp() {
   // Attach Clerk auth context to all requests (verifies session tokens if provided)
   app.use(clerkMiddleware());
 
+  // Ensure DB connection is active before processing API route operations
+  const { ensureDBConnected } = require('../db/connect');
+  const mongoose = require('mongoose');
+
+  app.use(async (req, res, next) => {
+    if (req.path === '/api/health') return next();
+    try {
+      await ensureDBConnected();
+      next();
+    } catch (dbErr) {
+      console.error('[API DB Guard] Failed to ensure database connection:', dbErr.message);
+      return res.status(503).json({
+        error: 'ServiceUnavailable',
+        message: 'Database connection temporarily lost. Please retry in a few seconds.',
+      });
+    }
+  });
+
   // Mount API route modules
   app.use('/api/auth', authRoutes);
   app.use('/api/interests', interestsRoutes);
@@ -52,9 +70,15 @@ function createApp() {
   app.use('/api/whatsapp', whatsappRoutes);
   app.use('/api/pipeline', pipelineRoutes);
 
-  // Health check endpoint
+  // Health check endpoint with DB state monitoring
   app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date() });
+    const dbState = mongoose.connection.readyState;
+    const dbStatusMap = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+    res.json({
+      status: dbState === 1 ? 'ok' : 'degraded',
+      database: dbStatusMap[dbState] || 'unknown',
+      timestamp: new Date(),
+    });
   });
 
   // Sentry debug test endpoint
