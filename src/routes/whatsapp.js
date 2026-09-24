@@ -70,8 +70,8 @@ router.post('/register-number', requireClerkAuth, async (req, res) => {
     );
 
     const infoMessage = isEligible
-      ? 'WhatsApp delivery activated! You have access to the premium WhatsApp digest.'
-      : "WhatsApp delivery is currently limited to a small invite list — you're all set on Telegram in the meantime.";
+      ? "You're on the list! WhatsApp delivery is now active."
+      : "This number isn't on the current invite list. You're all set on Telegram — no changes needed.";
 
     return res.status(200).json({
       success: true,

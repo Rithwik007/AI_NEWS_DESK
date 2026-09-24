@@ -7,6 +7,42 @@ import Spinner from '../components/Spinner';
 
 const BOT_USERNAME = 'ai_news_reader0310_bot';
 
+const COUNTRY_CODES = [
+  { code: '+91', label: '🇮🇳 India (+91)' },
+  { code: '+1', label: '🇺🇸/🇨🇦 USA/Canada (+1)' },
+  { code: '+44', label: '🇬🇧 UK (+44)' },
+  { code: '+971', label: '🇦🇪 UAE (+971)' },
+  { code: '+65', label: '🇸🇬 Singapore (+65)' },
+  { code: '+61', label: '🇦🇺 Australia (+61)' },
+  { code: '+49', label: '🇩🇪 Germany (+49)' },
+  { code: '+33', label: '🇫🇷 France (+33)' },
+  { code: '+81', label: '🇯🇵 Japan (+81)' },
+];
+
+function maskPhoneNumber(phone) {
+  if (!phone) return '';
+  const digits = String(phone).replace(/\D/g, '');
+  if (digits.length <= 3) return phone;
+  const last3 = digits.slice(-3);
+  const bullets = '•'.repeat(Math.max(6, digits.length - 3));
+  return `${bullets}${last3}`;
+}
+
+function parsePhoneNumber(fullPhone) {
+  if (!fullPhone) return { countryCode: '+91', nationalNumber: '' };
+  const str = String(fullPhone).trim();
+  const sorted = [...COUNTRY_CODES].sort((a, b) => b.code.length - a.code.length);
+  for (const item of sorted) {
+    if (str.startsWith(item.code)) {
+      return { countryCode: item.code, nationalNumber: str.slice(item.code.length).trim() };
+    }
+  }
+  if (str.startsWith('+')) {
+    return { countryCode: str.slice(0, 3), nationalNumber: str.slice(3).trim() };
+  }
+  return { countryCode: '+91', nationalNumber: str };
+}
+
 export default function TelegramConnect() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
@@ -22,12 +58,42 @@ export default function TelegramConnect() {
 
   // WhatsApp states
   const [waStatus, setWaStatus] = useState({ registered: false, phoneNumber: null, registeredAt: null });
-  const [waPhone, setWaPhone] = useState('');
+  const [countryCode, setCountryCode] = useState('+91');
+  const [nationalNumber, setNationalNumber] = useState('');
+  const [showPhone, setShowPhone] = useState(false);
   const [waSaving, setWaSaving] = useState(false);
   const [waError, setWaError] = useState(null);
   const [waSuccess, setWaSuccess] = useState(null);
 
+  // Telegram states
+  const [copiedCode, setCopiedCode] = useState(false);
+
   const pollTimerRef = useRef(null);
+  const phoneTimeoutRef = useRef(null);
+
+  function togglePhoneVisibility() {
+    setShowPhone((prev) => {
+      const next = !prev;
+      if (phoneTimeoutRef.current) clearTimeout(phoneTimeoutRef.current);
+      if (next) {
+        phoneTimeoutRef.current = setTimeout(() => {
+          setShowPhone(false);
+        }, 5000);
+      }
+      return next;
+    });
+  }
+
+  async function handleCopyCode() {
+    if (!codeData?.code) return;
+    try {
+      await navigator.clipboard.writeText(codeData.code);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy code:', err);
+    }
+  }
 
   // Check initial Telegram link status
   const checkStatus = React.useCallback(async () => {
@@ -59,7 +125,9 @@ export default function TelegramConnect() {
       if (data) {
         setWaStatus(data);
         if (data.phoneNumber) {
-          setWaPhone(data.phoneNumber);
+          const parsed = parsePhoneNumber(data.phoneNumber);
+          setCountryCode(parsed.countryCode);
+          setNationalNumber(parsed.nationalNumber);
         }
       }
     } catch (err) {
@@ -73,6 +141,7 @@ export default function TelegramConnect() {
 
     return () => {
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      if (phoneTimeoutRef.current) clearTimeout(phoneTimeoutRef.current);
     };
   }, [checkStatus, checkWhatsAppStatus]);
 
@@ -144,12 +213,18 @@ export default function TelegramConnect() {
     setWaSuccess(null);
 
     try {
+      const cleanDigits = nationalNumber.replace(/\D/g, '');
+      if (cleanDigits.length < 5 || cleanDigits.length > 15) {
+        throw new Error('Please enter valid phone number digits (no symbols or spaces needed)');
+      }
+      const fullPhoneNumber = `${countryCode}${cleanDigits}`;
+
       const data = await apiFetch(
         '/api/whatsapp/register-number',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phoneNumber: waPhone }),
+          body: JSON.stringify({ phoneNumber: fullPhoneNumber }),
         },
         getToken
       );
@@ -161,8 +236,14 @@ export default function TelegramConnect() {
           isWhatsAppEligible: Boolean(data.isWhatsAppEligible),
           registeredAt: data.registeredAt,
         });
-        setWaPhone(data.phoneNumber);
-        setWaSuccess(data.message || 'WhatsApp number saved successfully!');
+        const parsed = parsePhoneNumber(data.phoneNumber);
+        setCountryCode(parsed.countryCode);
+        setNationalNumber(parsed.nationalNumber);
+        setWaSuccess(
+          data.isWhatsAppEligible
+            ? "You're on the list! WhatsApp delivery is now active."
+            : "This number isn't on the current invite list. You're all set on Telegram — no changes needed."
+        );
         trackEvent('whatsapp_number_registered', { eligible: data.isWhatsAppEligible });
       } else {
         throw new Error(data?.message || 'Failed to register WhatsApp number');
@@ -254,19 +335,47 @@ export default function TelegramConnect() {
           </div>
         </div>
 
+        {/* Explanatory copy (Part A.1) */}
+        <div
+          style={{
+            padding: '0.85rem 1rem',
+            backgroundColor: '#FAF9F5',
+            border: '1px solid var(--color-hairline)',
+            borderRadius: '6px',
+            fontSize: '0.88rem',
+            color: 'var(--color-slate)',
+            marginBottom: '1.25rem',
+            lineHeight: 1.5,
+          }}
+        >
+          ℹ️ <strong>Invite list:</strong> WhatsApp delivery is currently available to a small invite list. Enter your number to check eligibility — if you&apos;re not on the list, you&apos;ll continue receiving your digest via Telegram, no action needed.
+        </div>
+
+        {/* Post-submission feedback (Part A.2) */}
         {waSuccess && (
           <div
             style={{
               padding: '0.75rem 1rem',
-              backgroundColor: 'rgba(47, 111, 98, 0.1)',
-              border: '1px solid var(--color-signal)',
-              borderRadius: '4px',
-              color: 'var(--color-signal)',
+              backgroundColor: waStatus.isWhatsAppEligible
+                ? 'rgba(47, 111, 98, 0.1)'
+                : '#FAF9F5',
+              border: waStatus.isWhatsAppEligible
+                ? '1px solid var(--color-signal)'
+                : '1px solid var(--color-hairline)',
+              borderRadius: '6px',
+              color: waStatus.isWhatsAppEligible
+                ? 'var(--color-signal)'
+                : 'var(--color-ink)',
               fontSize: '0.9rem',
               marginBottom: '1rem',
+              lineHeight: 1.4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
             }}
           >
-            ✓ {waSuccess}
+            <span>{waStatus.isWhatsAppEligible ? '✓' : 'ℹ️'}</span>
+            <span>{waSuccess}</span>
           </div>
         )}
 
@@ -276,7 +385,7 @@ export default function TelegramConnect() {
               padding: '0.75rem 1rem',
               backgroundColor: 'rgba(239, 68, 68, 0.1)',
               border: '1px solid #EF4444',
-              borderRadius: '4px',
+              borderRadius: '6px',
               color: '#B91C1C',
               fontSize: '0.9rem',
               marginBottom: '1rem',
@@ -286,19 +395,43 @@ export default function TelegramConnect() {
           </div>
         )}
 
-        <form onSubmit={handleSaveWhatsApp} style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ flex: '1', minWidth: '220px' }}>
-            <label htmlFor="whatsapp-phone-input" style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.35rem', color: 'var(--color-slate)' }}>
-              Phone number (E.164 format with country code)
-            </label>
+        {/* Two-part phone input: Country Code + National Number (Part B) */}
+        <form onSubmit={handleSaveWhatsApp} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <label htmlFor="whatsapp-phone-input" style={{ display: 'block', fontSize: '0.85rem', color: 'var(--color-slate)' }}>
+            WhatsApp phone number (select country &amp; enter digits)
+          </label>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <select
+              id="whatsapp-country-code"
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value)}
+              style={{
+                padding: '0.6rem 0.75rem',
+                border: '1px solid var(--color-hairline)',
+                borderRadius: '4px',
+                fontSize: '0.92rem',
+                backgroundColor: '#FAF9F5',
+                color: 'var(--color-ink)',
+                minWidth: '150px',
+                cursor: 'pointer',
+              }}
+            >
+              {COUNTRY_CODES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
             <input
               id="whatsapp-phone-input"
               type="tel"
-              value={waPhone}
-              onChange={(e) => setWaPhone(e.target.value)}
-              placeholder="+919876543210"
+              inputMode="numeric"
+              value={nationalNumber}
+              onChange={(e) => setNationalNumber(e.target.value)}
+              placeholder="98765 43210"
               style={{
-                width: '100%',
+                flex: '1',
+                minWidth: '160px',
                 padding: '0.6rem 0.85rem',
                 border: '1px solid var(--color-hairline)',
                 borderRadius: '4px',
@@ -308,8 +441,6 @@ export default function TelegramConnect() {
               }}
               required
             />
-          </div>
-          <div style={{ alignSelf: 'flex-end' }}>
             <button
               type="submit"
               disabled={waSaving}
@@ -331,25 +462,43 @@ export default function TelegramConnect() {
           </div>
         </form>
 
-        {waStatus.registered && waStatus.isWhatsAppEligible && (
-          <p className="text-slate" style={{ fontSize: '0.85rem', marginTop: '0.75rem' }}>
-            Registered number: <strong>{waStatus.phoneNumber}</strong>. You will receive morning (8:00 AM) &amp; evening (6:00 PM) WhatsApp digest templates.
-          </p>
-        )}
+        {/* Masked registered number with Show/Hide toggle (Part C) */}
+        {waStatus.registered && (
+          <div style={{ marginTop: '1rem', borderTop: '1px solid var(--color-hairline)', paddingTop: '0.85rem' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.88rem' }}>
+              <span className="text-slate">Registered number:</span>
+              <strong style={{ fontFamily: 'monospace', letterSpacing: '0.05em' }}>
+                {showPhone ? waStatus.phoneNumber : maskPhoneNumber(waStatus.phoneNumber)}
+              </strong>
+              <button
+                type="button"
+                onClick={togglePhoneVisibility}
+                aria-label={showPhone ? 'Mask phone number' : 'Reveal phone number'}
+                title={showPhone ? 'Mask phone number' : 'Reveal phone number'}
+                className="btn-secondary"
+                id="btn-toggle-phone-mask"
+                style={{
+                  padding: '0.15rem 0.45rem',
+                  fontSize: '0.75rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  lineHeight: 1.2,
+                }}
+              >
+                {showPhone ? 'Hide' : 'Show'}
+              </button>
+            </div>
 
-        {waStatus.registered && !waStatus.isWhatsAppEligible && (
-          <div
-            style={{
-              marginTop: '1rem',
-              padding: '0.85rem 1rem',
-              backgroundColor: '#FAF9F5',
-              border: '1px solid var(--color-hairline)',
-              borderRadius: '6px',
-              fontSize: '0.9rem',
-              color: 'var(--color-slate)',
-            }}
-          >
-            ℹ️ <strong>WhatsApp Invite List:</strong> WhatsApp delivery is currently limited to a small invite list — you&apos;re all set on Telegram in the meantime.
+            {waStatus.isWhatsAppEligible ? (
+              <p className="text-slate" style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                You will receive morning (8:00 AM) &amp; evening (6:00 PM) WhatsApp digest templates. Reply <strong>digest</strong> anytime for full articles.
+              </p>
+            ) : (
+              <p className="text-slate" style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
+                Digests will continue arriving via Telegram. We will notify you when WhatsApp expands to more users.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -448,8 +597,38 @@ export default function TelegramConnect() {
                   </button>
                 ) : (
                   <div>
-                    <div className="code-display" id="display-link-code">
-                      {codeData.code}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                      <div className="code-display" id="display-link-code">
+                        {codeData.code}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCopyCode}
+                        className="btn-secondary"
+                        id="btn-copy-code"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          padding: '0.55rem 0.85rem',
+                          fontSize: '0.85rem',
+                        }}
+                      >
+                        {copiedCode ? (
+                          <>
+                            <span style={{ color: 'var(--color-signal)' }}>✓</span>
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            <span>Copy code</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                     <div style={{ marginTop: '0.75rem' }}>
                       <a
