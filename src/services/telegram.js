@@ -344,10 +344,14 @@ async function deliverTopStoriesMultiUser(options = {}) {
 
     let sendSuccess = false;
     let channelDelivered = null;
+    let deliveryReason = null;
 
-    // Delivery Strategy: Send WhatsApp template push only if user registered number AND isWhatsAppEligible.
-    // Ineligible users or failed WhatsApp sends fall back to Telegram.
-    if (user.whatsappPhoneNumber && user.isWhatsAppEligible) {
+    // 1. WhatsApp-First Delivery:
+    // If user has registered WhatsApp phone AND isWhatsAppEligible:
+    // Attempt WhatsApp delivery FIRST (template push for scheduled runs).
+    const isWhatsAppTarget = Boolean(user.isWhatsAppEligible && user.whatsappPhoneNumber);
+
+    if (isWhatsAppTarget) {
       channelStats.whatsapp.attempted++;
       const todayFormatted = new Date().toLocaleDateString('en-US', {
         month: 'short',
@@ -356,41 +360,52 @@ async function deliverTopStoriesMultiUser(options = {}) {
       });
 
       if (options.dryRun) {
-        console.log(`[DRY RUN] Would send WhatsApp template "daily_digest_ready" to ${user.whatsappPhoneNumber} for user "${user.clerkUserId}".`);
+        console.log(`[Delivery] User "${user.clerkUserId}": [DRY RUN] WhatsApp attempted for ${user.whatsappPhoneNumber} (template: daily_digest_ready)`);
         totalMessagesSent++;
         totalArticlesDelivered += selectedArticles.length;
         sendSuccess = true;
         channelDelivered = 'whatsapp';
+        deliveryReason = 'WhatsApp succeeded (dry-run)';
         channelStats.whatsapp.succeeded++;
       } else {
         try {
-          console.log(`[WhatsApp] Sending push template "daily_digest_ready" to ${user.whatsappPhoneNumber}...`);
-          await sendWhatsAppTemplate(user.whatsappPhoneNumber, 'daily_digest_ready', [todayFormatted]);
+          console.log(`[Delivery] User "${user.clerkUserId}": Attempting WhatsApp delivery first (${user.whatsappPhoneNumber})...`);
+          const waRes = await sendWhatsAppTemplate(user.whatsappPhoneNumber, 'daily_digest_ready', [todayFormatted], 'en');
+
+          // Confirmed send: verify message ID returned by Meta Cloud API
+          const messageId = waRes?.messages?.[0]?.id;
+          if (!messageId) {
+            throw new Error(`Meta returned response without message ID: ${JSON.stringify(waRes)}`);
+          }
+
           totalMessagesSent++;
           totalArticlesDelivered += selectedArticles.length;
           sendSuccess = true;
           channelDelivered = 'whatsapp';
+          deliveryReason = `WhatsApp succeeded (wamid: ${messageId})`;
           channelStats.whatsapp.succeeded++;
-          console.log(`[WhatsApp] ✓ Digest template sent successfully to ${user.whatsappPhoneNumber}.`);
+          console.log(`[Delivery] User "${user.clerkUserId}": WhatsApp succeeded (wamid: ${messageId}). Telegram delivery skipped.`);
         } catch (waErr) {
           channelStats.whatsapp.failed++;
           channelStats.whatsapp.errors.push(`${user.clerkUserId} (${user.whatsappPhoneNumber}): ${waErr.message}`);
-          console.error(`[WhatsApp] ✗ Failed to send template to ${user.whatsappPhoneNumber}: ${waErr.message}`);
-          if (user.telegramChatId) {
-            console.log(`[WhatsApp] Falling back to Telegram for user "${user.clerkUserId}"...`);
-          } else {
-            errors.push({ userId: user.clerkUserId, phone: user.whatsappPhoneNumber, channel: 'whatsapp', error: waErr.message });
-          }
+          console.warn(`[Delivery] User "${user.clerkUserId}": WhatsApp attempted, failed with error "${waErr.message}". Falling back to Telegram.`);
+          deliveryReason = `WhatsApp failed (${waErr.message}), fell back to Telegram`;
         }
       }
+    } else {
+      const skipReason = !user.whatsappPhoneNumber
+        ? 'no WhatsApp phone registered'
+        : 'not WhatsApp-eligible';
+      deliveryReason = `User ${skipReason}, used Telegram directly`;
+      console.log(`[Delivery] User "${user.clerkUserId}": ${deliveryReason}.`);
     }
 
-    // Telegram delivery (if WhatsApp not registered or WhatsApp delivery failed)
+    // 2. Telegram Delivery (Primary for standard users, or fallback if WhatsApp failed)
     if (!sendSuccess && user.telegramChatId) {
       channelStats.telegram.attempted++;
       if (options.dryRun) {
         const totalChars = messages.reduce((s, m) => s + m.length, 0);
-        console.log(`[DRY RUN] Would send ${messages.length} message(s) to ${user.telegramChatId} (${selectedArticles.length} articles, ${totalChars} total chars)`);
+        console.log(`[Delivery] User "${user.clerkUserId}": [DRY RUN] Would send ${messages.length} message(s) to Telegram ${user.telegramChatId} (${selectedArticles.length} articles, ${totalChars} total chars)`);
         totalMessagesSent++;
         totalArticlesDelivered += selectedArticles.length;
         sendSuccess = true;
@@ -399,7 +414,7 @@ async function deliverTopStoriesMultiUser(options = {}) {
       } else {
         try {
           for (let mi = 0; mi < messages.length; mi++) {
-            console.log(`[Telegram] Sending digest chunk ${mi + 1}/${messages.length} to ${user.telegramChatId} (${messages[mi].length} chars)...`);
+            console.log(`[Delivery] User "${user.clerkUserId}": Sending Telegram chunk ${mi + 1}/${messages.length} to ${user.telegramChatId} (${messages[mi].length} chars)...`);
             await sendTelegramMessage(messages[mi], user.telegramChatId);
             if (mi < messages.length - 1) {
               await new Promise((r) => setTimeout(r, config.TELEGRAM_SEND_DELAY_MS));
@@ -410,17 +425,20 @@ async function deliverTopStoriesMultiUser(options = {}) {
           sendSuccess = true;
           channelDelivered = 'telegram';
           channelStats.telegram.succeeded++;
-          console.log(`[Telegram] ✓ Digest sent successfully to ${user.telegramChatId} (${messages.length} message chunk(s)).`);
+          console.log(`[Delivery] User "${user.clerkUserId}": Telegram succeeded (${messages.length} message chunk(s)). Delivery complete.`);
         } catch (err) {
           channelStats.telegram.failed++;
           channelStats.telegram.errors.push(`${user.clerkUserId} (${user.telegramChatId}): ${err.message}`);
-          console.error(`[Telegram] ✗ Failed to send digest to ${user.telegramChatId}: ${err.message}`);
+          console.error(`[Delivery] User "${user.clerkUserId}": Telegram failed with error "${err.message}".`);
           errors.push({ userId: user.clerkUserId, chatId: user.telegramChatId, channel: 'telegram', error: err.message });
         }
       }
+    } else if (!sendSuccess && !user.telegramChatId) {
+      console.warn(`[Delivery] User "${user.clerkUserId}": Delivery failed — no Telegram chat ID linked and WhatsApp not delivered.`);
+      errors.push({ userId: user.clerkUserId, channel: 'none', error: 'No Telegram chat ID and WhatsApp delivery unavailable or failed' });
     }
 
-    // Mark delivery on ArticleRelevance ONLY for this user
+    // Mark delivery on ArticleRelevance ONLY for this user with per-channel tracking
     if (sendSuccess && !options.dryRun) {
       const deliveredRelIds = selectedRels.map((r) => r._id);
       await ArticleRelevance.updateMany(
@@ -432,10 +450,11 @@ async function deliverTopStoriesMultiUser(options = {}) {
           $set: {
             deliveredAt: new Date(),
             deliveryStatus: 'delivered',
+            deliveryChannel: channelDelivered,
           },
         }
       );
-      console.log(`[Telegram] Updated ${deliveredRelIds.length} ArticleRelevance records for user "${user.clerkUserId}" with deliveryStatus = "delivered".`);
+      console.log(`[Delivery] User "${user.clerkUserId}": Updated ${deliveredRelIds.length} ArticleRelevance records (deliveryStatus="delivered", deliveryChannel="${channelDelivered}").`);
     }
 
     userDeliveryResults.push({
@@ -443,6 +462,8 @@ async function deliverTopStoriesMultiUser(options = {}) {
       chatId: user.telegramChatId,
       whatsappPhoneNumber: user.whatsappPhoneNumber,
       channel: channelDelivered,
+      reason: deliveryReason,
+      fallbackUsed: Boolean(isWhatsAppTarget && channelDelivered === 'telegram'),
       eligibleCount: eligibleRels.length,
       deliveredCount: selectedArticles.length,
       articles: selectedArticles.map((a) => ({

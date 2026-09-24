@@ -51,6 +51,11 @@ const articleRelevanceSchema = new mongoose.Schema({
     enum: ['delivered', 'failed', 'expired', null],
     default: null,
   },
+  deliveryChannel: {
+    type: String,
+    enum: ['whatsapp', 'telegram', null],
+    default: null,
+  },
   deliveredAt: {
     type: Date,
     default: null,

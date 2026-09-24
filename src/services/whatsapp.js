@@ -95,10 +95,10 @@ function chunkWhatsAppText(text, maxChunkSize = 3800) {
  * @param {string} toPhoneNumber - Destination phone number (E.164 or digits)
  * @param {string} templateName - Approved template name in Meta dashboard
  * @param {Array<string|number>} [parameters=[]] - Positional body parameters {{1}}, {{2}}, etc.
- * @param {string} [languageCode='en_US'] - Template language
+ * @param {string} [languageCode='en'] - Template language (Meta approved language, e.g. 'en')
  * @returns {Promise<Object>} Meta API response
  */
-async function sendWhatsAppTemplate(toPhoneNumber, templateName, parameters = [], languageCode = 'en_US') {
+async function sendWhatsAppTemplate(toPhoneNumber, templateName, parameters = [], languageCode = 'en') {
   const recipient = cleanPhoneNumber(toPhoneNumber);
   if (!recipient) {
     throw new Error('Valid recipient phone number is required');
@@ -142,12 +142,20 @@ async function sendWhatsAppTemplate(toPhoneNumber, templateName, parameters = []
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(10000),
   });
 
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok || data.error) {
     const errMsg = data.error ? `${data.error.message} (code: ${data.error.code})` : res.statusText;
     throw new Error(`WhatsApp Template API error HTTP ${res.status}: ${errMsg}`);
+  }
+
+  // Verify Meta send confirmation — ensure messages array with a valid message id exists
+  const messageId = data?.messages?.[0]?.id;
+  const messageStatus = data?.messages?.[0]?.message_status;
+  if (!messageId || messageStatus === 'failed') {
+    throw new Error(`WhatsApp send rejected or unconfirmed by Meta: ${JSON.stringify(data)}`);
   }
 
   return data;
@@ -195,12 +203,18 @@ async function sendWhatsAppMessage(toPhoneNumber, text) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10000),
     });
 
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok || data.error) {
       const errMsg = data.error ? `${data.error.message} (code: ${data.error.code})` : res.statusText;
       throw new Error(`WhatsApp Message API error HTTP ${res.status}: ${errMsg}`);
+    }
+
+    const messageId = data?.messages?.[0]?.id;
+    if (!messageId || data?.messages?.[0]?.message_status === 'failed') {
+      throw new Error(`WhatsApp send rejected or unconfirmed by Meta: ${JSON.stringify(data)}`);
     }
 
     lastResponse = data;
