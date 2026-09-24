@@ -6,6 +6,7 @@ const interestsRoutes = require('../routes/interests');
 const telegramRoutes = require('../routes/telegram');
 const pipelineRoutes = require('../routes/pipeline');
 const whatsappRoutes = require('../routes/whatsapp');
+const config = require('../config');
 
 /**
  * Creates and configures the Express API application.
@@ -16,7 +17,7 @@ function createApp() {
   const app = express();
 
   const allowedOrigins = [
-    process.env.FRONTEND_URL,
+    config.FRONTEND_URL,
     'http://localhost:5173',
     'http://localhost:3000',
   ].filter(Boolean);

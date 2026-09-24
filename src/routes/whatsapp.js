@@ -3,7 +3,8 @@ const router = express.Router();
 const User = require('../models/User');
 const config = require('../config');
 const { requireClerkAuth } = require('../middleware/auth');
-const { sendWhatsAppMessage, cleanPhoneNumber, isPhoneAllowed } = require('../services/whatsapp');
+const whatsappService = require('../services/whatsapp');
+const { cleanPhoneNumber, isPhoneAllowed } = whatsappService;
 const { generateChatResponse, resendLatestDigest } = require('../services/chat');
 
 /**
@@ -205,8 +206,8 @@ router.post('/webhook', async (req, res) => {
 
     if (!user) {
       console.log(`[WhatsApp Webhook] Sender ${from} not found in User records.`);
-      const onboardingMsg = "👋 Welcome to AI News Desk!\n\nYour WhatsApp number is not linked yet. Please sign in to your dashboard to link your number and receive AI news digests:\nhttps://ai-news-desk-alpha.vercel.app";
-      await sendWhatsAppMessage(from, onboardingMsg);
+      const onboardingMsg = `👋 Welcome to AI News Desk!\n\nYour WhatsApp number is not linked yet. Please sign in to your dashboard to link your number and receive AI news digests:\n${config.FRONTEND_URL}`;
+      await whatsappService.sendWhatsAppMessage(from, onboardingMsg);
       return;
     }
 
@@ -224,7 +225,7 @@ router.post('/webhook', async (req, res) => {
       senderId: from,
     });
 
-    await sendWhatsAppMessage(from, reply);
+    await whatsappService.sendWhatsAppMessage(from, reply);
     console.log(`[WhatsApp Webhook] Reply sent to ${from}.`);
   } catch (err) {
     console.error(`[WhatsApp Webhook] Error processing event: ${err.message}`, err);
