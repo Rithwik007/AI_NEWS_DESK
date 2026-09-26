@@ -56,14 +56,17 @@ async function processTelegramUpdate(update) {
 
   // 3. Check for /digest on-demand command
   if (text.toLowerCase() === '/digest') {
-    await resendLatestDigest(user, chatId);
+    await resendLatestDigest(user, chatId, { channel: 'telegram' });
     return { action: 'resend_digest', chatId, userId: user.clerkUserId };
   }
 
   // 4. Conversational chat handling
   console.log(`[Telegram Webhook] Processing conversational message from user "${user.clerkUserId}": "${text}"`);
   try {
-    const reply = await generateChatResponse(user, text);
+    const reply = await generateChatResponse(user, text, {
+      channel: 'telegram',
+      senderId: chatId,
+    });
     await sendTelegramMessage(reply, chatId);
     return { action: 'chat_reply', chatId, userId: user.clerkUserId, replyLength: reply?.length || 0 };
   } catch (err) {

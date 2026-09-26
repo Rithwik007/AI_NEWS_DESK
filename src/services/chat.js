@@ -138,8 +138,8 @@ async function generateChatResponse(user, userText, options = {}) {
   const history = await getRecentChatHistory(userId, config.CHAT_HISTORY_LIMIT, userMsgDoc._id);
   const digestContext = await getRecentDigestArticles(userId, 48);
 
-  // 3. Construct prompt
-  const systemPrompt = `You are a knowledgeable, concise, and helpful personal AI assistant for this user's AI news bot.
+  // 3. Construct prompt with warm, casual friend persona (distinct from factual summary prompts)
+  const systemPrompt = `You're chatting with a friend who built this news bot. Be warm, casual, and personable — like texting a friend, not a formal assistant. You can be a little playful.
 You have access to the user's recently delivered digest articles (provided below).
 
 --- RECENT DIGEST ARTICLES ---
@@ -147,9 +147,9 @@ ${digestContext}
 ------------------------------
 
 INSTRUCTIONS:
-1. If the user's question relates to one of the provided digest articles, use the factual details from the article (title, publication outlet, summary, why it matters) to give an insightful, accurate answer.
-2. If the user's question does NOT relate to the digest articles, answer normally as a helpful assistant using your general knowledge. Do NOT force connections to AI news or the digest if the user is asking about an unrelated topic (e.g. general trivia, coding help, other news).
-3. Keep answers clear, conversational, and direct for mobile chat reading. Avoid unnecessary preamble.`;
+1. If the user asks about news, recent events, or topics from their digest, use the factual details from the articles above (title, outlet, summary, why it matters) to give an insightful, friendly, and accurate take.
+2. If the user asks about anything else (general questions, coding, chit-chat, everyday life), chat naturally and casually as a friend. Do NOT force connections to AI news or the digest if they're asking about an unrelated topic.
+3. Keep answers warm, concise, conversational, and direct for mobile chat (WhatsApp/Telegram). Avoid robotic preamble, corporate disclaimers, or overly formal sign-offs.`;
 
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -164,7 +164,7 @@ INSTRUCTIONS:
     const data = await groqRotator.callChatCompletion({
       model: groqModel,
       messages,
-      temperature: 0.5,
+      temperature: 0.75,
       max_tokens: 1024,
     });
 
@@ -333,7 +333,7 @@ async function generateAndDeliverWelcomeDigest(user, targetId, channel) {
   await ArticleRelevance.bulkWrite(bulkOps);
   console.log(`[Welcome Digest] Persisted ${top5.length} ArticleRelevance records (delivered) for user "${userId}".`);
 
-  // 6. Format and send welcome digest
+  // 6. Format and send welcome digest with unique conversational greeting
   const selectedArticles = top5.map(({ article, rankingScore, confidenceTier, matchedTopic }) => ({
     ...article,
     rankingScore,
@@ -341,11 +341,64 @@ async function generateAndDeliverWelcomeDigest(user, targetId, channel) {
     matchedTopic,
   }));
 
+  const welcomeGreeting = await generateDigestGreeting();
+  if (welcomeGreeting) {
+    if (channel === 'whatsapp') {
+      await whatsappService.sendWhatsAppMessage(targetId, welcomeGreeting);
+    } else {
+      await telegramService.sendTelegramMessage(welcomeGreeting, targetId);
+    }
+    await new Promise((r) => setTimeout(r, 600));
+  }
+
   const welcomeHeader = `📰 *Your Welcome AI News Digest*\n\nHere are top stories matching your interests from the past 24 hours:\n\n`;
   await sendDigestMessages(selectedArticles, targetId, channel, welcomeHeader);
 
   console.log(`[Welcome Digest] Successfully delivered welcome digest to user "${userId}" via ${channel}.`);
   return true;
+}
+
+/**
+ * Generate a short, warm, unique one-sentence opening line for on-demand digest requests.
+ * Uses Groq fresh on every call with varied phrasing, asking if they enjoy the digest or want adjustments.
+ * Never blocks or delays digest delivery if Groq fails or times out.
+ *
+ * @returns {Promise<string|null>} 1-sentence greeting or null
+ */
+async function generateDigestGreeting() {
+  try {
+    const groqModel = config.GROQ_CHAT_MODEL || config.GROQ_MODEL || 'openai/gpt-oss-20b';
+
+    const greetingPromise = groqRotator.callChatCompletion({
+      model: groqModel,
+      messages: [
+        {
+          role: 'system',
+          content: 'You write brief, natural, warm one-sentence greetings from a friend who created an AI news bot. Output only the single sentence itself, no quotes, no preamble, and do not use placeholder names like [Name] or made-up names.'
+        },
+        {
+          role: 'user',
+          content: "Write one short, warm, casual opening line (1 sentence) greeting a friend and gently asking if they're enjoying their AI news digest or want anything adjusted. Vary the phrasing naturally and creatively — feel free to use varied styles like direct questions, casual check-ins, or friendly notes. Do not repeat the same opening structure or formula every time."
+        }
+      ],
+      temperature: 1.0,
+      max_tokens: 500,
+    });
+
+    // 4-second timeout to ensure greeting generation NEVER delays digest delivery
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 4000));
+    const completion = await Promise.race([greetingPromise, timeoutPromise]);
+
+    if (!completion || !completion.choices?.[0]?.message?.content) {
+      return null;
+    }
+
+    const greeting = completion.choices[0].message.content.trim().replace(/^["']|["']$/g, '');
+    return greeting || null;
+  } catch (err) {
+    console.warn(`[Chat] Failed to generate dynamic digest greeting: ${err.message}`);
+    return null;
+  }
 }
 
 /**
@@ -421,6 +474,17 @@ async function resendLatestDigest(user, targetId, options = {}) {
     matchedTopic: r.matchedTopic,
   }));
 
+  // Generate a dynamic, unique 1-sentence friendly greeting via Groq
+  const greeting = await generateDigestGreeting();
+  if (greeting) {
+    if (isWhatsApp) {
+      await whatsappService.sendWhatsAppMessage(targetId, greeting);
+    } else {
+      await telegramService.sendTelegramMessage(greeting, targetId);
+    }
+    await new Promise((r) => setTimeout(r, 600));
+  }
+
   const header = `📰 *Your Latest AI News Digest*\n\n`;
   await sendDigestMessages(selectedArticles, targetId, channel, header);
   console.log(`[Chat] Resent latest digest to user "${userId}" via ${channel} (${selectedArticles.length} articles).`);
@@ -444,6 +508,7 @@ module.exports = {
   getRecentChatHistory,
   getRecentDigestArticles,
   generateChatResponse,
+  generateDigestGreeting,
   resendLatestDigest,
   generateAndDeliverWelcomeDigest,
   sendDigestMessages,
