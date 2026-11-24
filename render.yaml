@@ -3,7 +3,7 @@ services:
     name: ai-news-web
     env: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm ci
     startCommand: node src/scripts/startAll.js
     envVars:
       - key: NODE_ENV

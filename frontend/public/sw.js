@@ -1,4 +1,4 @@
-const CACHE_NAME = 'newsdesk-shell-v2';
+const CACHE_NAME = 'newsdesk-shell-v3';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -21,7 +21,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) {
+          if (key.startsWith('newsdesk-shell-') && key !== CACHE_NAME) {
             return caches.delete(key);
           }
         })
@@ -35,7 +35,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   // Skip caching for API calls (always live network)
-  if (url.pathname.startsWith('/api') || event.request.method !== 'GET') {
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api') || event.request.method !== 'GET') {
     return;
   }
 
@@ -53,8 +53,9 @@ self.addEventListener('fetch', (event) => {
         .catch(() => {
           // If offline and navigating to a page, serve the shell
           if (event.request.mode === 'navigate') {
-            return caches.match('/index.html') || caches.match('/');
+            return caches.match('/index.html');
           }
+          return Response.error();
         });
 
       return cachedResponse || fetchPromise;

@@ -9,36 +9,24 @@ const config = require('../config');
  * @returns {boolean}
  */
 function validateStartupEnv(options = { failFast: true }) {
+  const whatsappEnabled = Boolean(config.WHATSAPP_ACCESS_TOKEN || config.WHATSAPP_PHONE_NUMBER_ID || config.WHATSAPP_BUSINESS_ACCOUNT_ID || config.WEBHOOK_VERIFY_TOKEN || process.env.WHATSAPP_APP_SECRET);
   const checks = [
     { name: 'MONGODB_URI', value: config.MONGODB_URI, required: true },
     { name: 'GROQ_API_KEY', value: config.GROQ_API_KEYS?.[0] || config.GROQ_API_KEY, required: true },
     { name: 'TELEGRAM_BOT_TOKEN', value: config.TELEGRAM_BOT_TOKEN, required: true },
     { name: 'CLERK_SECRET_KEY', value: config.CLERK_SECRET_KEY, required: true },
     { name: 'CLERK_PUBLISHABLE_KEY', value: config.CLERK_PUBLISHABLE_KEY, required: true },
-    { name: 'WEBHOOK_VERIFY_TOKEN', value: config.WEBHOOK_VERIFY_TOKEN, required: true },
-    { name: 'WHATSAPP_ACCESS_TOKEN', value: config.WHATSAPP_ACCESS_TOKEN, required: true },
-    { name: 'WHATSAPP_PHONE_NUMBER_ID', value: config.WHATSAPP_PHONE_NUMBER_ID, required: true },
-    { name: 'WHATSAPP_BUSINESS_ACCOUNT_ID', value: config.WHATSAPP_BUSINESS_ACCOUNT_ID, required: true },
-    { name: 'TELEGRAM_WEBHOOK_SECRET', value: config.TELEGRAM_WEBHOOK_SECRET, required: false },
-    { name: 'SENTRY_DSN', value: process.env.SENTRY_DSN, required: false },
+    { name: 'WEBHOOK_VERIFY_TOKEN', value: config.WEBHOOK_VERIFY_TOKEN, required: whatsappEnabled },
+    { name: 'WHATSAPP_ACCESS_TOKEN', value: config.WHATSAPP_ACCESS_TOKEN, required: whatsappEnabled },
+    { name: 'WHATSAPP_PHONE_NUMBER_ID', value: config.WHATSAPP_PHONE_NUMBER_ID, required: whatsappEnabled },
+    { name: 'WHATSAPP_BUSINESS_ACCOUNT_ID', value: config.WHATSAPP_BUSINESS_ACCOUNT_ID, required: whatsappEnabled },
+    { name: 'WHATSAPP_APP_SECRET', value: process.env.WHATSAPP_APP_SECRET, required: whatsappEnabled },
+    { name: 'TELEGRAM_WEBHOOK_SECRET', value: config.TELEGRAM_WEBHOOK_SECRET, required: true },
   ];
 
-  const missingRequired = [];
-  const missingOptional = [];
-
-  for (const item of checks) {
-    if (!item.value || String(item.value).trim() === '') {
-      if (item.required) {
-        missingRequired.push(item.name);
-      } else {
-        missingOptional.push(item.name);
-      }
-    }
-  }
-
-  if (missingOptional.length > 0) {
-    console.warn(`[Startup Warning] Recommended environment variables not set: ${missingOptional.join(', ')}`);
-  }
+  const missingRequired = checks
+    .filter(item => item.required && !String(item.value || '').trim())
+    .map(item => item.name);
 
   if (missingRequired.length > 0) {
     const divider = '='.repeat(72);

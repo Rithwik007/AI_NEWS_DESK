@@ -3,6 +3,8 @@ node_modules/
 
 # Environment variables — NEVER commit secrets
 .env
+.env.*
+!.env.example
 
 # Model cache (transformers.js downloads ONNX models here)
 .cache/

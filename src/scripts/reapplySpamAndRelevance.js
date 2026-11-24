@@ -1,3 +1,5 @@
+require('dotenv').config();
+if (!process.env.TEST_CLERK_USER_ID) throw new Error('Set TEST_CLERK_USER_ID to a disposable Clerk test account ID.');
 const { connectDB, disconnectDB } = require('../db/connect');
 const Article = require('../models/Article');
 const ArticleRelevance = require('../models/ArticleRelevance');
@@ -6,7 +8,7 @@ const { scoreRelevance, checkSpamKeywords } = require('../services/relevance');
 const { getConfidenceTier } = require('../services/summarize');
 const config = require('../config');
 
-const USER_1_ID = 'user_3J9Rl5FHP3tYTNadS74NSmjwUZi';
+const USER_1_ID = process.env.TEST_CLERK_USER_ID;
 
 async function reapplyRelevanceAndSpam() {
   console.log('=== RETROACTIVE RESCORE & SPAM FILTER REAPPLICATION ===\n');

@@ -12,13 +12,9 @@ const { processTelegramUpdate } = require('../services/telegramWebhook');
  * Acknowledges HTTP 200 immediately, then processes update asynchronously.
  */
 router.post('/webhook', async (req, res) => {
-  // Validate secret token if TELEGRAM_WEBHOOK_SECRET is configured
-  if (config.TELEGRAM_WEBHOOK_SECRET) {
-    const receivedSecret = req.headers['x-telegram-bot-api-secret-token'];
-    if (receivedSecret !== config.TELEGRAM_WEBHOOK_SECRET) {
-      console.warn('[Telegram Webhook] Unauthorized: X-Telegram-Bot-Api-Secret-Token mismatch');
-      return res.status(403).json({ error: 'Forbidden', message: 'Secret token mismatch' });
-    }
+  const receivedSecret = req.get('x-telegram-bot-api-secret-token');
+  if (!config.TELEGRAM_WEBHOOK_SECRET || receivedSecret !== config.TELEGRAM_WEBHOOK_SECRET) {
+    return res.status(403).json({ error: 'Forbidden' });
   }
 
   // Acknowledge immediately to prevent Telegram retries / timeouts

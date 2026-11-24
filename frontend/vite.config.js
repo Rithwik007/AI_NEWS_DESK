@@ -3,12 +3,12 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, path.resolve(__dirname, '..'), '');
+  const env = { ...loadEnv(mode, path.resolve(import.meta.dirname, '..'), ''), ...loadEnv(mode, import.meta.dirname, ''), ...process.env };
   const clerkKey =
     env.VITE_CLERK_PUBLISHABLE_KEY ||
     env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
     env.CLERK_PUBLISHABLE_KEY ||
-    'pk_test_b2JsaWdpbmctbWFjYXF1ZS01MzU4LmNsZXJrLmFjY291bnRzLmRldiQ';
+    '';
 
   const posthogKey =
     env.VITE_POSTHOG_KEY ||
@@ -33,7 +33,6 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
-    envPrefix: ['VITE_', 'POSTHOG_', 'SENTRY_'],
     define: {
       'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': JSON.stringify(clerkKey),
       'import.meta.env.VITE_POSTHOG_KEY': JSON.stringify(posthogKey),

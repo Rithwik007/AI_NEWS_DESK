@@ -7,7 +7,8 @@
     "start": "node src/scripts/startAll.js",
     "start:web": "node src/server.js",
     "start:all": "node src/scripts/startAll.js",
-    "fetch": "node src/index.js"
+    "fetch": "node src/index.js",
+    "test": "node --test src/tests/test-summarize-unit.js src/tests/test-whatsapp-eligibility.js src/tests/test-webhook-watchdog.js src/tests/test-telegram-webhook-route.js src/tests/test-whatsapp-onboarding-url.js"
   },
   "keywords": [
     "ai",
@@ -19,7 +20,7 @@
   "license": "ISC",
   "dependencies": {
     "@clerk/express": "^2.1.67",
-    "@huggingface/transformers": "^3.4.0",
+    "@huggingface/transformers": "^4.3.2",
     "@sentry/node": "^10.74.0",
     "cors": "^2.8.6",
     "dotenv": "^16.4.7",
@@ -30,6 +31,9 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "lighthouse": "^11.7.1"
+    "lighthouse": "^13.6.0"
+  },
+  "engines": {
+    "node": ">=22.19.0"
   }
 }

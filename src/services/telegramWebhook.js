@@ -12,15 +12,13 @@ const { captureException } = require('./sentry');
  * @returns {Promise<Object|null>}
  */
 async function processTelegramUpdate(update) {
-  if (!update || !update.message) return null;
+  if (!update?.message || update.message.chat?.type !== 'private') return null;
 
   const msg = update.message;
   const chatId = msg.chat?.id;
   const text = (msg.text || '').trim();
 
   if (!chatId || !text) return null;
-
-  console.log(`[Telegram Webhook] Incoming message from chat ${chatId}: "${text}"`);
 
   // 1. Check for /start command (linking flow)
   if (text.startsWith('/start')) {
@@ -37,7 +35,7 @@ async function processTelegramUpdate(update) {
     const result = await verifyAndLinkTelegramCode(code, chatId);
     await sendTelegramMessage(result.message, chatId);
 
-    console.log(`[Telegram Webhook] Link attempt for chat ${chatId} with code "${code}": ${result.success ? 'SUCCESS' : result.reason}`);
+    console.log(`[Telegram Webhook] Link attempt for chat ${chatId}: ${result.success ? 'SUCCESS' : result.reason}`);
     return { action: 'link_attempt', chatId, code, result };
   }
 
@@ -61,7 +59,7 @@ async function processTelegramUpdate(update) {
   }
 
   // 4. Conversational chat handling
-  console.log(`[Telegram Webhook] Processing conversational message from user "${user.clerkUserId}": "${text}"`);
+  console.log(`[Telegram Webhook] Processing conversational message from user "${user.clerkUserId}"`);
   try {
     const reply = await generateChatResponse(user, text, {
       channel: 'telegram',

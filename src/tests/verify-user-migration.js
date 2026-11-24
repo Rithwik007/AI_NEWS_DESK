@@ -1,11 +1,13 @@
 require('dotenv').config();
+if (!process.env.TEST_CLERK_USER_ID) throw new Error('Set TEST_CLERK_USER_ID to a disposable Clerk test account ID.');
+if (!process.env.TEST_CLERK_USER_ID_2) throw new Error('Set TEST_CLERK_USER_ID_2 to a disposable Clerk test account ID.');
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const InterestProfile = require('../models/InterestProfile');
 const ArticleRelevance = require('../models/ArticleRelevance');
 
-const OLD_TEST_ID = 'user_3J9Rl5FHP3tYTNadS74NSmjwUZi';
-const REAL_USER_ID = 'user_3JEbz6SSqzGyAWyPDFRx7wvePp1';
+const OLD_TEST_ID = process.env.TEST_CLERK_USER_ID;
+const REAL_USER_ID = process.env.TEST_CLERK_USER_ID_2;
 
 async function verify() {
   console.log('=== DATABASE USER MIGRATION AUDIT ===\n');
@@ -28,7 +30,7 @@ async function verify() {
 
   console.log(`\n  Old test user exists in User:  ${!!oldUserExists} (expected: false)`);
   console.log(`  Real user exists in User:      ${!!realUser} (expected: true)`);
-  console.log(`  Real user telegramChatId:      ${realUser?.telegramChatId} (expected: 7106031577)`);
+  console.log(`  Real user telegramChatId:      ${realUser?.telegramChatId} (expected: 100001)`);
 
   // 2. InterestProfile collection
   const allProfiles = await InterestProfile.find({}).lean();

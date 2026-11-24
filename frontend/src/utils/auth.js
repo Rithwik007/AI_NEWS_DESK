@@ -6,11 +6,6 @@
  * @returns {Promise<string|null>}
  */
 export async function getAuthToken(clerkGetToken) {
-  if (typeof window !== 'undefined') {
-    const devToken = localStorage.getItem('dev_auth_token');
-    if (devToken) return devToken;
-  }
-
   if (typeof clerkGetToken === 'function') {
     try {
       const token = await clerkGetToken();

@@ -14,8 +14,7 @@ async function checkTelegramWebhookHealth(options = {}) {
     return { healthy: false, reason: 'TELEGRAM_BOT_TOKEN is not configured', details: {} };
   }
 
-  const defaultExpectedUrl = 'https://ai-news-backend-rmdj.onrender.com/api/telegram/webhook';
-  const expectedUrl = options.expectedUrl || process.env.TELEGRAM_WEBHOOK_URL || defaultExpectedUrl;
+  const expectedUrl = options.expectedUrl || process.env.TELEGRAM_WEBHOOK_URL;
 
   try {
     const res = await fetch(`https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}/getWebhookInfo`);
@@ -39,8 +38,8 @@ async function checkTelegramWebhookHealth(options = {}) {
     }
 
     // Check 2: Webhook URL should match expected endpoint
-    if (!info.url.includes('/api/telegram/webhook')) {
-      const errMsg = `Telegram webhook URL mismatch. Current: "${info.url}", Expected to contain "/api/telegram/webhook"`;
+    if (expectedUrl && info.url !== expectedUrl) {
+      const errMsg = `Telegram webhook URL mismatch. Current: "${info.url}", Expected: "${expectedUrl}"`;
       console.error(`[Webhook Watchdog] ❌ ${errMsg}`);
       captureMessage(errMsg, 'error', { tags: { component: 'telegram_webhook_watchdog', alertType: 'url_mismatch' } });
       return { healthy: false, reason: errMsg, details: info };
@@ -87,6 +86,7 @@ async function checkTelegramWebhookHealth(options = {}) {
  * @returns {Promise<{ healthy: boolean, reason: string|null, details: Object }>}
  */
 async function checkWhatsAppWebhookHealth() {
+  if (!config.WHATSAPP_ACCESS_TOKEN) return { healthy: true, skipped: true, details: {} };
   const issues = [];
   const details = {};
 

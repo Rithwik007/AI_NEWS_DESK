@@ -1,3 +1,5 @@
+require('dotenv').config();
+if (!process.env.TEST_CLERK_USER_ID_2) throw new Error('Set TEST_CLERK_USER_ID_2 to a disposable Clerk test account ID.');
 const { connectDB, disconnectDB } = require('../db/connect');
 const User = require('../models/User');
 const InterestProfile = require('../models/InterestProfile');
@@ -5,7 +7,7 @@ const { createApp } = require('../api/app');
 const { clerkClient } = require('@clerk/express');
 const { verifyAndLinkTelegramCode } = require('../services/telegramAuth');
 
-const TARGET_CLERK_USER_ID = 'user_3JEbz6SSqzGyAWyPDFRx7wvePp1';
+const TARGET_CLERK_USER_ID = process.env.TEST_CLERK_USER_ID_2;
 
 async function runTests() {
   console.log('=== MULTI-USER STEP A & B ENDPOINT VERIFICATION SUITE ===\n');
@@ -184,7 +186,7 @@ async function runTests() {
 
     // Now simulate linking with the generated code
     console.log(`Simulating user linking Telegram with code: ${authCodeData.code}...`);
-    const linkResult = await verifyAndLinkTelegramCode(authCodeData.code, '7106031577');
+    const linkResult = await verifyAndLinkTelegramCode(authCodeData.code, '100001');
     console.log('Link result success:', linkResult.success);
 
     const statusAfter = await fetch(`${baseUrl}/api/telegram/status`, {
@@ -192,7 +194,7 @@ async function runTests() {
     }).then((r) => r.json());
 
     console.log('Status AFTER linking:', JSON.stringify(statusAfter));
-    if (statusAfter.linked !== true || String(statusAfter.telegramChatId) !== '7106031577') {
+    if (statusAfter.linked !== true || String(statusAfter.telegramChatId) !== '100001') {
       throw new Error('Test 5 Failed: Expected linked: true with telegramChatId after linking.');
     }
     console.log('✓ Test 5 Passed: GET /api/telegram/status correctly reflects linked: false then linked: true.\n');

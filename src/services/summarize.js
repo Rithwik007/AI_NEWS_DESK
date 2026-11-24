@@ -220,25 +220,12 @@ async function summarizeRelevantClusters(options = {}) {
         console.log(`  - Selected: [${articleToSummarize.source}] "${articleToSummarize.title.slice(0, 60)}..."\n`);
       }
 
-      // Find top ArticleRelevance record across all users for this article
-      const topRelevance = await ArticleRelevance.findOne({ articleId: primary._id, isRelevant: true })
-        .sort({ rankingScore: -1 })
-        .lean();
-
-      const confidenceTier = topRelevance?.confidenceTier || getConfidenceTier(topRelevance?.rankingScore || primary.rankingScore || 0);
-      const matchedTopic = topRelevance?.matchedTopic || primary.matchedTopic || null;
-      const rankingScore = topRelevance?.rankingScore ?? primary.rankingScore ?? null;
-
-      console.log(`[${itemNum}/${relevantPrimaries.length}] Summarizing (${confidenceTier.toUpperCase()}): "${articleToSummarize.title.slice(0, 70)}..."`);
-
-      // 3. Call Groq API with calibrated confidence tier
+      // Articles are shared. The model only receives public source material for shared copy.
+      console.log(`[${itemNum}/${relevantPrimaries.length}] Summarizing: "${articleToSummarize.title.slice(0, 70)}..."`);
       const result = await callGroqSummarize({
         title: articleToSummarize.title,
         snippet: articleToSummarize.snippet,
         source: articleToSummarize.source,
-        matchedTopic,
-        confidenceTier,
-        rankingScore,
       });
 
       // 4. Save to DB (unless dryRun)
@@ -249,6 +236,7 @@ async function summarizeRelevantClusters(options = {}) {
             $set: {
               summary: result.summary,
               whyReadThis: result.whyReadThis,
+              publicRationale: true,
               summarizedAt: new Date(),
               selectedArticleId: articleToSummarize._id,
             },

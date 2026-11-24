@@ -1,3 +1,4 @@
+process.env.MONGODB_URI ||= 'mongodb://127.0.0.1/newsdesk_test';
 const assert = require('assert');
 const config = require('../config');
 const { cleanPhoneNumber, isPhoneAllowed } = require('../services/whatsapp');
@@ -8,29 +9,29 @@ async function runEligibilityTests() {
   console.log('=============================================\n');
 
   // Test 1: Single number parsing (no commas)
-  console.log('[Test 1] Testing single number env parsing (e.g. WHATSAPP_ALLOWED_NUMBERS=+917013560134)...');
-  const singleEnv = '+917013560134';
+  console.log('[Test 1] Testing single number env parsing (e.g. WHATSAPP_ALLOWED_NUMBERS=+910000000134)...');
+  const singleEnv = '+910000000134';
   const parsedSingle = singleEnv.split(',').map((n) => n.trim()).filter(Boolean);
   assert.strictEqual(parsedSingle.length, 1);
-  assert.strictEqual(parsedSingle[0], '+917013560134');
+  assert.strictEqual(parsedSingle[0], '+910000000134');
   console.log('✓ Single number parsed correctly without commas.');
 
   // Test 2: Multi-number with whitespace
   console.log('\n[Test 2] Testing multi-number env parsing with spaces...');
-  const multiEnv = '+917013560134,  +15551234567 ,   +919876543210  ';
+  const multiEnv = '+910000000134,  +15551234567 ,   +919876543210  ';
   const parsedMulti = multiEnv.split(',').map((n) => n.trim()).filter(Boolean);
-  assert.deepStrictEqual(parsedMulti, ['+917013560134', '+15551234567', '+919876543210']);
+  assert.deepStrictEqual(parsedMulti, ['+910000000134', '+15551234567', '+919876543210']);
   console.log('✓ Whitespace around commas trimmed cleanly.');
 
   // Test 3: isPhoneAllowed matching logic
   console.log('\n[Test 3] Testing isPhoneAllowed with formatting variations...');
   const origAllowed = config.WHATSAPP_ALLOWED_NUMBERS;
-  config.WHATSAPP_ALLOWED_NUMBERS = ['+917013560134', '+15551234567'];
+  config.WHATSAPP_ALLOWED_NUMBERS = ['+910000000134', '+15551234567'];
 
   // Allowed variations
-  assert.strictEqual(isPhoneAllowed('+917013560134'), true);
-  assert.strictEqual(isPhoneAllowed('917013560134'), true);
-  assert.strictEqual(isPhoneAllowed('+91 70135-60134'), true);
+  assert.strictEqual(isPhoneAllowed('+910000000134'), true);
+  assert.strictEqual(isPhoneAllowed('910000000134'), true);
+  assert.strictEqual(isPhoneAllowed('+91 00000-00134'), true);
   assert.strictEqual(isPhoneAllowed('+1 (555) 123-4567'), true);
 
   // Ineligible numbers
@@ -44,7 +45,7 @@ async function runEligibilityTests() {
   console.log('\n[Test 4] Testing pipeline channel routing logic...');
   const eligibleUser = {
     clerkUserId: 'user_eligible',
-    whatsappPhoneNumber: '+917013560134',
+    whatsappPhoneNumber: '+910000000134',
     isWhatsAppEligible: true,
     telegramChatId: '11111',
   };

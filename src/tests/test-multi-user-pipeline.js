@@ -1,3 +1,5 @@
+require('dotenv').config();
+if (!process.env.TEST_CLERK_USER_ID_2) throw new Error('Set TEST_CLERK_USER_ID_2 to a disposable Clerk test account ID.');
 const { connectDB, disconnectDB } = require('../db/connect');
 const User = require('../models/User');
 const Article = require('../models/Article');
@@ -9,7 +11,7 @@ const { summarizeRelevantClusters } = require('../services/summarize');
 const { deliverTop5ToTelegram } = require('../services/telegram');
 const config = require('../config');
 
-const USER_1_ID = 'user_3JEbz6SSqzGyAWyPDFRx7wvePp1';
+const USER_1_ID = process.env.TEST_CLERK_USER_ID_2;
 const USER_2_ID = 'test_user_robotics_982';
 
 async function runMultiUserPipelineTests() {
@@ -30,7 +32,7 @@ async function runMultiUserPipelineTests() {
     // Ensure User 1 has Telegram chat ID linked
     await User.updateOne(
       { clerkUserId: USER_1_ID },
-      { $set: { telegramChatId: config.TELEGRAM_CHAT_ID || '7106031577', telegramLinkedAt: new Date() } },
+      { $set: { telegramChatId: config.TELEGRAM_CHAT_ID, telegramLinkedAt: new Date() } },
       { upsert: true }
     );
 

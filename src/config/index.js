@@ -184,7 +184,7 @@ const config = {
   BACKEND_URL: process.env.BACKEND_URL || null,
 
   // Frontend dashboard public URL
-  FRONTEND_URL: process.env.FRONTEND_URL || 'https://ai-news-desk-ecru.vercel.app',
+  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173',
 
   // --- WhatsApp Meta Cloud API ---
   WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN || null,

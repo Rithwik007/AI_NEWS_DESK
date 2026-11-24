@@ -52,6 +52,7 @@ const articleSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  publicRationale: Boolean,
   whyReadThis: {
     type: String,
     default: null,

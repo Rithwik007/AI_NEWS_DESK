@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, useUser, useClerk } from '@clerk/clerk-react';
-import { getAuthToken } from '../utils/auth';
 import { apiFetch } from '../utils/api';
 import { identifyUser, trackPageView, resetAnalytics } from '../utils/analytics';
 import Spinner from './Spinner';
@@ -12,12 +11,12 @@ export default function AppLayout() {
   const { signOut } = useClerk();
   const navigate = useNavigate();
   const location = useLocation();
-  const [deliveryConnected, setDeliveryConnected] = useState(false);
+  const [whatsappEligible, setWhatsappEligible] = useState(false);
   const [telegramLinked, setTelegramLinked] = useState(false);
   const [syncing, setSyncing] = useState(true);
 
-  const devToken = typeof window !== 'undefined' ? localStorage.getItem('dev_auth_token') : null;
-  const isAuthenticated = isSignedIn || !!devToken;
+  const deliveryConnected = whatsappEligible || telegramLinked;
+  const isAuthenticated = isSignedIn;
 
   // Track pageviews on location changes
   useEffect(() => {
@@ -55,10 +54,10 @@ export default function AppLayout() {
           ]);
 
           const isTg = Boolean(tgStatus?.linked);
-          const isWa = Boolean(waStatus?.registered);
+          const isWa = Boolean(waStatus?.isWhatsAppEligible);
 
           setTelegramLinked(isTg);
-          setDeliveryConnected(isTg || isWa);
+          setWhatsappEligible(isWa);
         } catch (err) {
           console.error('[AppLayout] Sync error:', err);
         } finally {
@@ -161,7 +160,7 @@ export default function AppLayout() {
 
       {/* Main Content Area */}
       <main className="content-area">
-        <Outlet context={{ telegramLinked, setTelegramLinked }} />
+        <Outlet context={{ deliveryConnected, telegramLinked, setTelegramLinked, setWhatsappEligible }} />
       </main>
 
       {/* Mobile Bottom Tab Bar (Thumb-reachable) */}

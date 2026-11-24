@@ -40,6 +40,10 @@ const userSchema = new mongoose.Schema({
     default: null,
     index: true,
   },
+  whatsappVerifiedAt: Date,
+  whatsappPendingNumber: String,
+  whatsappLinkCode: String,
+  whatsappLinkExpiry: Date,
   whatsappRegisteredAt: {
     type: Date,
     default: null,
@@ -53,6 +57,11 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+});
+
+// Only verified records claim a number. Legacy registrations can verify in place.
+userSchema.index({ whatsappPhoneNumber: 1 }, {
+  unique: true, name: 'verified_whatsapp_number', partialFilterExpression: { whatsappVerifiedAt: { $type: 'date' } },
 });
 
 const User = mongoose.model('User', userSchema);

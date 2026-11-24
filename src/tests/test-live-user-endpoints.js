@@ -1,9 +1,10 @@
 require('dotenv').config();
+if (!process.env.TEST_CLERK_USER_ID_3) throw new Error('Set TEST_CLERK_USER_ID_3 to a disposable Clerk test account ID.');
 const config = require('../config');
 
 async function testLiveEndpointsWithClerkToken() {
   console.log('Testing live Render backend with real Clerk session token...');
-  const clerkUserId = 'user_3JEiVTkaMiLMxjxLMFeqJkv3FO8'; // vsnira456@gmail.com
+  const clerkUserId = process.env.TEST_CLERK_USER_ID_3;
 
   // 1. Create a session or sign-in token via Clerk backend API
   // Using Clerk API: POST https://api.clerk.com/v1/tokens to create a testing token or impersonation token
@@ -44,7 +45,7 @@ async function testLiveEndpointsWithClerkToken() {
   const jwt = tokenData.jwt;
   console.log('Obtained Clerk JWT successfully! Length:', jwt.length);
 
-  const target = process.env.TEST_TARGET || 'remote';
+  const target = process.env.TEST_TARGET || 'local';
   let backendUrl;
   let server;
 
@@ -58,7 +59,7 @@ async function testLiveEndpointsWithClerkToken() {
     backendUrl = `http://localhost:${port}`;
     console.log(`Testing against LOCAL server: ${backendUrl}`);
   } else {
-    backendUrl = 'https://ai-news-backend-rmdj.onrender.com';
+    backendUrl = process.env.BACKEND_URL;
     console.log(`Testing against REMOTE server: ${backendUrl}`);
   }
 

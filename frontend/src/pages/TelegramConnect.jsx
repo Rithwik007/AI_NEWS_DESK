@@ -5,7 +5,7 @@ import { apiFetch } from '../utils/api';
 import { trackEvent } from '../utils/analytics';
 import Spinner from '../components/Spinner';
 
-const BOT_USERNAME = 'ai_news_reader0310_bot';
+const BOT_USERNAME = (import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '').replace(/^@/, '');
 
 const COUNTRY_CODES = [
   { code: '+91', label: '🇮🇳 India (+91)' },
@@ -46,7 +46,7 @@ function parsePhoneNumber(fullPhone) {
 export default function TelegramConnect() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
-  const { setTelegramLinked } = useOutletContext() || {};
+  const { setTelegramLinked, setWhatsappEligible } = useOutletContext() || {};
 
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ linked: false, telegramChatId: null, linkedAt: null });
@@ -124,6 +124,8 @@ export default function TelegramConnect() {
       const data = await apiFetch('/api/whatsapp/status', {}, getToken);
       if (data) {
         setWaStatus(data);
+        setWhatsappEligible?.(Boolean(data.isWhatsAppEligible));
+        if (data.isWhatsAppEligible) setWaSuccess(null);
         if (data.phoneNumber) {
           const parsed = parsePhoneNumber(data.phoneNumber);
           setCountryCode(parsed.countryCode);
@@ -133,7 +135,7 @@ export default function TelegramConnect() {
     } catch (err) {
       console.error('[WhatsApp] Status check failed:', err);
     }
-  }, [getToken]);
+  }, [getToken, setWhatsappEligible]);
 
   useEffect(() => {
     checkStatus();
@@ -230,21 +232,8 @@ export default function TelegramConnect() {
       );
 
       if (data && data.success) {
-        setWaStatus({
-          registered: true,
-          phoneNumber: data.phoneNumber,
-          isWhatsAppEligible: Boolean(data.isWhatsAppEligible),
-          registeredAt: data.registeredAt,
-        });
-        const parsed = parsePhoneNumber(data.phoneNumber);
-        setCountryCode(parsed.countryCode);
-        setNationalNumber(parsed.nationalNumber);
-        setWaSuccess(
-          data.isWhatsAppEligible
-            ? "You're on the list! WhatsApp delivery is now active."
-            : "This number isn't on the current invite list. You're all set on Telegram — no changes needed."
-        );
-        trackEvent('whatsapp_number_registered', { eligible: data.isWhatsAppEligible });
+        setWaSuccess(data.message);
+        trackEvent('whatsapp_link_requested');
       } else {
         throw new Error(data?.message || 'Failed to register WhatsApp number');
       }
@@ -267,7 +256,7 @@ export default function TelegramConnect() {
     );
   }
 
-  const deepLink = codeData ? `https://t.me/${BOT_USERNAME}?start=${codeData.code}` : null;
+  const deepLink = codeData && BOT_USERNAME ? `https://t.me/${BOT_USERNAME}?start=${codeData.code}` : null;
 
   return (
     <div style={{ maxWidth: '680px' }}>
@@ -376,6 +365,7 @@ export default function TelegramConnect() {
           >
             <span>{waStatus.isWhatsAppEligible ? '✓' : 'ℹ️'}</span>
             <span>{waSuccess}</span>
+            <button type="button" className="btn-secondary" onClick={checkWhatsAppStatus}>Check connection</button>
           </div>
         )}
 
@@ -632,7 +622,7 @@ export default function TelegramConnect() {
                     </div>
                     <div style={{ marginTop: '0.75rem' }}>
                       <a
-                        href={deepLink}
+                        hidden={!deepLink} href={deepLink}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="btn-primary btn-full-mobile"
@@ -655,12 +645,12 @@ export default function TelegramConnect() {
                 <p>
                   Tap the button above, or open{' '}
                   <a
-                    href={`https://t.me/${BOT_USERNAME}`}
+                    href={BOT_USERNAME ? `https://t.me/${BOT_USERNAME}` : undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: 'var(--color-ink)', fontWeight: 600 }}
                   >
-                    @{BOT_USERNAME}
+                    {BOT_USERNAME ? `@${BOT_USERNAME}` : 'your configured bot'}
                   </a>{' '}
                   in Telegram and send:
                 </p>

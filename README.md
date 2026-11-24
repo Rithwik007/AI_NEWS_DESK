@@ -1,178 +1,52 @@
-# AI News Delivery Pipeline
+# AI News Desk
 
-Automated, personalized AI-news curation pipeline delivering deduplicated, relevance-filtered, and honesty-calibrated digests twice daily via Telegram.
+AI News Desk reads AI news feeds, groups coverage of the same story, ranks stories against each reader’s interests and delivers a personal digest. The React dashboard manages topics and delivery channels. [Open the hosted dashboard](https://ai-news-desk-ecru.vercel.app).
 
-[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/atlas)
-[![Telegram](https://img.shields.io/badge/Telegram-Bot%20API-26A5E4?logo=telegram&logoColor=white)](https://core.telegram.org/bots)
+## How a story reaches you
 
----
+1. The Express service schedules a morning run at 08:00 and an evening run at 18:00 in Asia/Kolkata. It fetches RSS, Google News searches and Hacker News results.
+2. Transformers.js embeds article text locally. The pipeline clusters related stories, checks recent MongoDB articles for duplicates, screens spam and ranks candidates by topic similarity and priority.
+3. Groq summarizes selected stories. The morning edition covers the prior 24 hours. The evening edition selects newly ingested coverage.
+4. Telegram delivers the digest. For invited WhatsApp numbers the service attempts a Meta template first and can fall back to linked Telegram. Incoming bot commands and chat arrive through webhooks.
 
-## Live Application
+## Try the frontend
 
-- **Web Dashboard**: [https://ai-news-desk-ecru.vercel.app](https://ai-news-desk-ecru.vercel.app)
+Use 64-bit Node.js 22.19 or newer with npm. On Windows, macOS or Linux, run the following in a terminal.
 
-> [!NOTE]
-> This application is a personal curation tool designed for private delivery. While the dashboard supports Clerk authentication and interest profile configuration, receiving digests requires linking a Telegram chat ID with the bot. The raw backend API URL is kept internal to protect free-tier compute resources from untrusted traffic and because all operational endpoints require authenticated Clerk JWTs or internal scheduling keys.
-
----
-
-## What It Does
-
-The AI News Delivery Pipeline continuously aggregates articles across 15 technical journalism outlets, primary research lab blogs, and community forums. Articles are embedded locally into dense vectors to cluster duplicate coverage across syndicates and deduplicate stories against a rolling 24-hour history.
-
-The pipeline evaluates unique story clusters against individual user interest profiles, filtering out PR and financial spam before scoring relevance. A fast Groq LPU inference engine summarizes representative articles with calibrated honesty, ensuring borderline matches are never oversold. Personalized digests are formatted and dispatched directly to users on Telegram twice daily (a 24-hour top-5 morning digest and an incremental evening update), configured via a responsive Progressive Web App dashboard.
-
----
-
-## Key Features
-
-- **Semantic Deduplication**: Generates 384-dimensional dense embeddings in-process using `all-MiniLM-L6-v2`. Groups syndicated coverage into cohesive story clusters via Union-Find clustering with an empirically calibrated `0.72` cosine threshold, merging cross-run duplicates across rolling 24-hour windows.
-- **Honest, Confidence-Tiered Summaries**: Uses Groq (`openai/gpt-oss-20b`) with adaptive prompt constraints. Low-confidence matches explicitly inform the reader of their peripheral nature rather than hallucinating topical connections to user focus areas.
-- **Decoupled Relevance Scoring**: Employs an unweighted raw similarity admission gate (`bestRawSimilarity >= 0.45`) separated from priority weight multipliers (`rankingScore = rawSim * weight`), preventing low-weight niche topics from being mathematically locked out.
-- **Keyword Spam & PR Shield**: Multi-pattern regex filter blocking stock pump speculation, SEO market CAGR projections, boilerplate certificates, and affiliate listicles (scale-verified across 753 real-world primary articles with 0 false positives).
-- **Twice-Daily Incremental Dispatch**: Dispatches a full top-5 digest at 08:00 IST and an incremental digest at 18:00 IST covering only stories newly ingested since the morning run.
-- **Multi-User Isolation**: Independent user profiles with Clerk Google OAuth authentication, isolated `ArticleRelevance` records, and private Telegram delivery targets.
-- **Installable PWA Dashboard**: Fast React 18 frontend with Paper/Ink editorial typography, visual loading spinners, inline action retries, automatic 401 session expiration handling, global offline detection, and custom 404 routing.
-
----
-
-## Architecture
-
-```mermaid
-flowchart TD
-    subgraph Ingestion ["1. Multi-Source Ingestion & Dedup"]
-        A[15 News Feeds<br/>Tech Media, Lab Blogs, Reddit, HN] -->|Fetch Articles| B[Local Embedding Engine<br/>all-MiniLM-L6-v2 ONNX]
-        B -->|Cosine Similarity >= 0.72| C[Union-Find Clustering &<br/>Cross-Run Dedup]
-        C -->|Persist Unique Clusters| D[(MongoDB Atlas<br/>Articles)]
-    end
-
-    subgraph UserPipeline ["2. Per-User Personalization & Delivery"]
-        D --> E[Relevance Gatekeeper<br/>Raw Similarity >= 0.45]
-        U[(User Profiles)] --> E
-        E -->|Spam Shield Passed| F[Topic Weighted Ranking<br/>rankingScore = rawSim * weight]
-        F --> G[Source Authority Scorer<br/>Tier 1 Labs > Tier 2 Tech Media]
-        G --> H[Groq LPU Inference<br/>openai/gpt-oss-20b]
-        H -->|Calibrated Tone Prompts| I[Telegram Delivery Service<br/>Top-5 Morning & Evening]
-        I -->|Direct Message| J([Telegram User])
-    end
-
-    subgraph WebDashboard ["3. User Dashboard & Management"]
-        K([User Browser]) -->|Google OAuth| L[Clerk Auth]
-        L --> M[React 18 PWA<br/>Vercel CDN]
-        M -->|REST API + JWT| N[Express Server & Poller<br/>Render Persistent Host]
-        N --> U
-    end
-```
-
----
-
-## Tech Stack
-
-| Technology | Purpose |
-| :--- | :--- |
-| **Node.js & Express** | Asynchronous backend API and scheduled pipeline runtime. |
-| **MongoDB Atlas** | Document storage for articles, user profiles, relevance scores, and run logs. |
-| **`@huggingface/transformers`** | In-process ONNX embeddings (`all-MiniLM-L6-v2`) with zero external API costs. |
-| **Groq API (`openai/gpt-oss-20b`)** | Sub-second LPU inference producing factual summaries and reasoning. |
-| **Telegram Bot API** | Direct push delivery with Markdown formatting and zero messaging infrastructure costs. |
-| **Clerk** | Drop-in Google OAuth authentication and session management. |
-| **React 18 + Vite** | Lightweight Progressive Web App with custom offline and error resilience states. |
-| **Render** | Persistent Linux container hosting Express and Telegram long-polling worker. |
-| **Vercel** | Edge CDN hosting the static React single-page frontend. |
-| **Sentry** | End-to-end crash reporting and missed-run watchdog monitoring. |
-| **PostHog** | Client-side product analytics tracking pageviews and user actions. |
-| **cron-job.org** | External health pinger preventing free-tier compute sleep. |
-
----
-
-## Interesting Engineering Decisions
-
-- **Decoupling Gatekeeping from Ranking Weights**: An early implementation calculated relevance as `score = rawSimilarity * weight` and checked `score >= threshold`. This mathematically prevented lower-weighted topics (e.g. weight 0.3) from ever passing admission regardless of match quality. The architecture was corrected by decoupling admission (`bestRawSimilarity >= 0.45`) from prioritization (`rankingScore = rawSim * weight`), ensuring low-weight topics remain deliverable when high-priority topics are quiet.
-- **Empirical Dedup Threshold Tuning (0.75 → 0.72)**: During validation against 4,465 article pairs, an initial 0.75 cosine similarity threshold missed a syndicated pair covering an identical "Jalapeño AI chip" story (similarity 0.7427). Retuning to 0.72 successfully unified the cluster while maintaining a 3.4% safety margin above the nearest false-positive pair (0.6860), which was subsequently validated against organic multi-source news merges.
-- **Honesty Calibration for Borderline Articles**: Standard LLM prompting tends to hallucinate relevance to justify an article's presence. By introducing confidence tiers (`high`, `moderate`, `low`), low-confidence articles are constrained via strict negative system instructions to explicitly describe articles as peripheral overviews rather than fabricating links to the user's primary focus area.
-- **Process Persistence vs. Serverless Webhooks**: A split-hosting strategy was chosen using Render for backend and Vercel for frontend. While serverless functions were initially considered for the API, Telegram long-polling and in-process cron scheduling required persistent execution. Hosting a unified background runner (`startAll.js`) on Render eliminated webhook exposure and SSL certificate maintenance on free-tier infrastructure.
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- MongoDB database instance (Atlas URI or local)
-- Telegram Bot token (from `@BotFather`)
-- Groq Cloud API key
-- Clerk application keys (Google OAuth enabled)
-
-### 1. Clone and Install Dependencies
-
-```bash
+```sh
 git clone https://github.com/Rithwik007/AI_NEWS_DESK.git
 cd AI_NEWS_DESK
-
-# Install backend dependencies
-npm install
-
-# Install frontend dependencies
-cd frontend
-npm install
-cd ..
+npm ci --prefix frontend
+npm run dev --prefix frontend
 ```
 
-### 2. Environment Configuration
+Open the local URL Vite prints. The public front page and interactive edition preview work without accounts or keys.
 
-Create a `.env` file in the project root:
+## Run your own desk
 
-```env
-MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/ai-news?retryWrites=true&w=majority
-GROQ_API_KEY=gsk_...
-TELEGRAM_BOT_TOKEN=123456789:ABCdef...
-CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-SENTRY_DSN=https://...
-PORT=3000
-```
+1. From the repository root run `npm ci`. Copy `.env.example` to `.env` and `frontend/.env.example` to `frontend/.env`. You can copy and rename both files in your file manager.
+2. Start MongoDB locally or enter your own Atlas URI in `MONGODB_URI`. In Atlas, grant the app database access and allow connections from your backend host. First-time embedding inference downloads the model and needs outbound internet access and writable cache space.
+3. Create a Clerk application. Enable the sign-in methods you want. Put its publishable key in both examples’ corresponding local env files and its secret key only in the root file. Add your Groq key and a Telegram token from BotFather. Set the bot username in the frontend file.
+4. Generate a Telegram webhook secret with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`. Set it in the root file. Use a bot dedicated to your instance. Telegram sends updates to one webhook per bot.
+5. Run `npm run start:web` and, in a second terminal, `npm run dev --prefix frontend`. Check [local API health](http://localhost:3000/api/health) for a connected database. The default Vite proxy targets port 3000. Restart Vite after editing frontend settings.
+6. For bot linking and incoming commands, expose the backend through a public HTTPS deployment or tunnel. Set `TELEGRAM_WEBHOOK_URL` to its full `/api/telegram/webhook` URL. Run `node src/scripts/setTelegramWebhook.js` and then `node src/scripts/setTelegramWebhook.js --info`. Sign in, set your interests, open Delivery Channels, generate a code and follow the Telegram link. Use `npm start` for normal service startup with bot command registration.
 
-Create a `frontend/.env` file:
+### Optional WhatsApp delivery
 
-```env
-VITE_API_BASE_URL=http://localhost:3000
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
-VITE_SENTRY_DSN=https://...
-VITE_POSTHOG_KEY=phc_...
-VITE_POSTHOG_HOST=https://us.i.posthog.com
-```
+Fill in the entire WhatsApp group in the root example using your Meta app secret, Cloud API access token, phone number ID, business account ID, a verification token you choose, and comma-separated invited numbers with country codes. Configure the Meta callback at your backend’s `/api/whatsapp/webhook`, subscribe to messages and approve the English `daily_digest_ready` template with its date parameter. Give invitees your WhatsApp business contact. In Delivery Channels, request a link code and send the displayed command to that contact from the invited phone. Existing WhatsApp users must confirm their number once after upgrading. Leave the group empty for Telegram-only use.
 
-### 3. Run Locally
+### Deployment
 
-```bash
-# Terminal 1: Start backend server and Telegram polling worker
-npm run start:all
+Run the backend as one persistent Node process with the scheduler active. Set `FRONTEND_URL` to the exact dashboard origin and configure the root variables on the host. For Vercel, select `frontend` as the project root, use `npm run build`, publish `dist` and set `VITE_API_BASE_URL`, `VITE_CLERK_PUBLISHABLE_KEY` and `VITE_TELEGRAM_BOT_USERNAME` before building. Configure the deployed domain in Clerk and register the production bot webhook. Set `DISABLE_SCHEDULER=false` on one always-on delivery host. The local example disables scheduling. At startup and every ten minutes the service checks MongoDB for the current India-time edition and runs it if missing. A sleeping backend needs an external wake-up or an always-on host. Completed editions from prior days are skipped.
 
-# Terminal 2: Start frontend Vite dev server
-cd frontend
-npm run dev
-```
+### Verification
 
-To run a manual one-off pipeline execution:
+If you use an external keep-alive job, point it at `GET /api/health` on your backend every ten minutes. Check its execution history for timely HTTP 200 responses. The app schedules editions internally. A health check alone cannot confirm digest delivery.
 
-```bash
-node src/index.js
-```
+Groq accepts a primary key and up to four optional failover keys in the example configuration. For observability, configure the backend Sentry DSN on the API host and the frontend Sentry DSN and PostHog project key on the frontend host. Rebuild the frontend after changing its public configuration.
 
----
+Run `npm test` for offline checks and `npm run build --prefix frontend` to compile the dashboard. Other scripts in `src/tests` include historical diagnostics and integrations that change database records, create sessions or send messages. Use disposable accounts, a separate database and a dedicated bot for integration testing.
 
-## Project Status
+For end-to-end acceptance, sign in to your instance, save a topic, reload to confirm persistence, link your own chat and request `/digest`. Check the next scheduled run and your receiving device. A successful health response confirms API and database availability. Scheduled delivery also depends on source feeds, Groq, the bot webhook and your channel settings.
 
-Actively running in daily production for verified users. Built with an emphasis on empirical validation:
-- Cosine clustering threshold verified across 4,465 article pairs.
-- Keyword spam shield audited across 753 live articles with zero false positives.
-- Full-stack observability instrumented with Sentry missed-run watchdogs and PostHog telemetry.
-
----
-
-## Author
-
-Created by **Rithwik Racharla**.
+Created by Rithwik Racharla.

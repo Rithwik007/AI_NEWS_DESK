@@ -36,24 +36,11 @@ async function main() {
     return;
   }
 
-  const defaultWebhookUrl = 'https://ai-news-backend-rmdj.onrender.com/api/telegram/webhook';
-  const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL || defaultWebhookUrl;
-
-  console.log(`[Telegram Webhook] Registering webhook to: ${webhookUrl}`);
-  if (config.TELEGRAM_WEBHOOK_SECRET) {
-    console.log('[Telegram Webhook] Including X-Telegram-Bot-Api-Secret-Token protection.');
-  } else {
-    console.log('[Telegram Webhook] No TELEGRAM_WEBHOOK_SECRET set; registering without secret token.');
+  const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
+  if (!webhookUrl || new URL(webhookUrl).protocol !== 'https:' || !config.TELEGRAM_WEBHOOK_SECRET) {
+    throw new Error('Set TELEGRAM_WEBHOOK_URL to your public HTTPS webhook and configure TELEGRAM_WEBHOOK_SECRET.');
   }
-
-  const body = {
-    url: webhookUrl,
-    allowed_updates: ['message'],
-  };
-
-  if (config.TELEGRAM_WEBHOOK_SECRET) {
-    body.secret_token = config.TELEGRAM_WEBHOOK_SECRET;
-  }
+  const body = { url: webhookUrl, allowed_updates: ['message'], secret_token: config.TELEGRAM_WEBHOOK_SECRET };
 
   const setRes = await fetch(`${baseUrl}/setWebhook`, {
     method: 'POST',

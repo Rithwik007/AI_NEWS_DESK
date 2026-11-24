@@ -13,7 +13,7 @@ function createMockUser(overrides = {}) {
   return {
     clerkUserId: 'test_user_1',
     telegramChatId: '123456789',
-    whatsappPhoneNumber: '+917013560134',
+    whatsappPhoneNumber: '+910000000134',
     isWhatsAppEligible: true,
     ...overrides,
   };

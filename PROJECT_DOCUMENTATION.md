@@ -231,6 +231,22 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 
 ---
 
+### 2026-11-24 — Public release preparation and full-stack verification
+
+- **What was built.** Added a public edition preview and a shared interactive schedule in the dashboard. Account screens load on demand. The README and both environment examples now cover a credential-free frontend preview, self-hosted Clerk, Telegram webhooks, optional WhatsApp and single-host scheduling.
+- **Why.** The prior setup inherited the author's service configuration, and the public instructions still described Telegram polling. Login could migrate a previous test account into the next new signup. The deployed database also showed a gap between its November 2 evening record and its November 24 morning record. The records do not establish the cause of that gap.
+- **How it works.** Signup upserts only the authenticated identity. Link codes are consumed atomically. Invited WhatsApp users confirm a short-lived command from their phone before delivery. The service validates signed Meta webhooks, requires a Telegram webhook secret, restricts manual pipeline runs and omits raw webhook logs. Shared story summaries use public source material. Digest delivery checks per-user relevance. A single scheduler checks the current India-time edition on startup and every ten minutes, with overlapping pipeline runs rejected inside the process. Use an awake backend for on-time delivery.
+- **Verification performed.** A fresh Windows installation with Node 24.16 passed both locked installs, the seven default checks and the Vite production build. npm reported zero known advisories for both dependency trees. Local integration checks used MongoDB, the actual 384-dimensional embedding model and controlled RSS, Groq and messaging responses. They exercised account isolation, interest persistence, channel linking, morning delivery and evening deduplication. A fresh model download also succeeded. Chrome rendered the public preview at 320, 390 and 1440 pixels, the protected route redirected to login, and both configured Clerk forms loaded. The deployed site served the login and signup forms, its health endpoint reported a connected database and its signed-out interests endpoint returned 401. The configured bot webhook, Groq model and approved English WhatsApp template were checked read-only. The existing service recorded a successful November 24 morning run across both channels. Physical receipt and macOS/Linux runtime behavior require separate acceptance checks.
+- **Bugs found and fixed.** Cross-account migration ran in ordinary signup, webhook diagnostics exposed payloads, and entering an invited phone number previously granted delivery eligibility without proof of possession. Ingestion previously failed on a compressed feed. Shared database connections were closed by scheduled runs and intentional disconnects triggered reconnect attempts. The scheduler previously required the host to execute within a single scheduled minute. Fixed these paths, updated dependencies, removed hardcoded service targets from normal setup and removed personal identifiers from tracked test fixtures. Earlier Git commits retain historical identifiers.
+
+### 2026-11-24 — Hosted configuration and release handoff
+
+- **What was built.** Documented the optional Groq failover and observability variables in both environment examples and clarified the external health job in the README.
+- **Why.** Operators need to distinguish a successful health ping from a recorded digest delivery.
+- **How it works.** The ten-minute external job requests the backend health route. The backend scheduler selects the current edition and consults MongoDB before starting it.
+- **Verification performed.** The deployed frontend and API health returned HTTP 200. The frontend bundle contained Clerk, Sentry and PostHog configuration. Telegram reported the expected webhook URL and an empty update queue. Provider-side authentication checks identified one rejected credential in the local Groq pool. The private cron history and telemetry ingestion were not independently confirmed.
+- **Bugs found and fixed.** The examples omitted supported failover and reporting variables. The prior operational notes overstated the availability guarantee of a keep-alive job.
+
 ## 5. Known Limitations & Backlog (Not Yet Resolved)
 1. **PWA Service Worker Stale-Cache**:
    - Service worker caches the application shell. A frontend rebuild on Vercel may require a hard refresh on mobile if cached assets are held.
@@ -262,7 +278,7 @@ Both delivery channels (Telegram and WhatsApp) are now 100% webhook-based:
 **Permanent Elimination of Poller Failure Class**:
 - Neither channel depends on a persistent in-process polling loop (`startTelegramPoller`), while-loops, or offset tracking in `BotState`.
 - The entire category of bugs that previously caused multi-day silent freezes (hung `getUpdates` TCP sockets, supervisor backoff crash loops, `BotState` offset desync during Render cold-starts) is **permanently eliminated**.
-- The only operational requirement is keeping the single Express web process alive and warm, which is guaranteed by the dual keep-alive mechanism (external `cron-job.org` + internal self-ping).
+- The only operational requirement is keeping the single Express web process alive and warm, which depends on host availability. Check the external job history and actual run records to verify continuity.
 
 **Known Remaining Failure Modes & Automated Safeguards**:
 While in-process polling hangs are eliminated, the system is not failure-proof against external vendor and platform events:

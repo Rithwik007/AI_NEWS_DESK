@@ -1,4 +1,6 @@
 require('dotenv').config();
+if (!process.env.TEST_CLERK_USER_ID_2) throw new Error('Set TEST_CLERK_USER_ID_2 to a disposable Clerk test account ID.');
+if (!process.env.TEST_CLERK_USER_ID_3) throw new Error('Set TEST_CLERK_USER_ID_3 to a disposable Clerk test account ID.');
 const assert = require('assert');
 const { createApp } = require('../api/app');
 const { connectDB, disconnectDB } = require('../db/connect');
@@ -47,8 +49,8 @@ async function runTests() {
 
   // Test Part C: Masking
   console.log('[Part C] Testing maskPhoneNumber...');
-  const masked1 = maskPhoneNumber('+917013560134');
-  console.log('+917013560134 masked:', masked1);
+  const masked1 = maskPhoneNumber('+910000000134');
+  console.log('+910000000134 masked:', masked1);
   assert.strictEqual(masked1.slice(-3), '134');
   assert.ok(masked1.includes('•••••'));
 
@@ -60,9 +62,9 @@ async function runTests() {
 
   // Test Part B: Parsing & Concatenation
   console.log('[Part B] Testing parsePhoneNumber and two-part formatting...');
-  const p1 = parsePhoneNumber('+917013560134');
+  const p1 = parsePhoneNumber('+910000000134');
   assert.strictEqual(p1.countryCode, '+91');
-  assert.strictEqual(p1.nationalNumber, '7013560134');
+  assert.strictEqual(p1.nationalNumber, '0000000134');
 
   const p2 = parsePhoneNumber('+971501234567');
   assert.strictEqual(p2.countryCode, '+971');
@@ -74,7 +76,7 @@ async function runTests() {
 
   // Concatenate back
   const recombined = `${p1.countryCode}${p1.nationalNumber.replace(/\\D/g, '')}`;
-  assert.strictEqual(recombined, '+917013560134');
+  assert.strictEqual(recombined, '+910000000134');
   console.log('✓ Part B parsing & concatenation tests passed.\n');
 
   // Test Part A: Backend API response messaging
@@ -92,7 +94,7 @@ async function runTests() {
     const sRes = await fetch('https://api.clerk.com/v1/sessions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${config.CLERK_SECRET_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: 'user_3JEbz6SSqzGyAWyPDFRx7wvePp1' }),
+      body: JSON.stringify({ user_id: process.env.TEST_CLERK_USER_ID_2 }),
     });
     const session = await sRes.json();
     const tRes = await fetch(`https://api.clerk.com/v1/sessions/${session.id}/tokens`, {
@@ -102,11 +104,11 @@ async function runTests() {
     const { jwt } = await tRes.json();
 
     // Test Eligible number submission
-    console.log('Submitting eligible allowlist number (+917013560134)...');
+    console.log('Submitting eligible allowlist number (+910000000134)...');
     const eligibleRes = await fetch(`${baseUrl}/api/whatsapp/register-number`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumber: '+917013560134' }),
+      body: JSON.stringify({ phoneNumber: '+910000000134' }),
     });
     const eligibleData = await eligibleRes.json();
     console.log('Eligible response:', eligibleData);
@@ -120,7 +122,7 @@ async function runTests() {
     const sRes2 = await fetch('https://api.clerk.com/v1/sessions', {
       method: 'POST',
       headers: { Authorization: `Bearer ${config.CLERK_SECRET_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: 'user_3JEiVTkaMiLMxjxLMFeqJkv3FO8' }),
+      body: JSON.stringify({ user_id: process.env.TEST_CLERK_USER_ID_3 }),
     });
     const session2 = await sRes2.json();
     const tRes2 = await fetch(`https://api.clerk.com/v1/sessions/${session2.id}/tokens`, {

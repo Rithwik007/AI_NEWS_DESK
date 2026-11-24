@@ -1,3 +1,4 @@
+const { createHmac, timingSafeEqual, randomBytes } = require('node:crypto');
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
@@ -41,46 +42,16 @@ router.post('/register-number', requireClerkAuth, async (req, res) => {
       });
     }
 
-    // Check if phone number is already registered to another user
-    const existing = await User.findOne({
-      whatsappPhoneNumber: formattedNumber,
-      clerkUserId: { $ne: clerkUserId },
-    }).lean();
-
-    if (existing) {
-      return res.status(409).json({
-        error: 'PhoneNumberAlreadyRegistered',
-        message: 'This WhatsApp phone number is already linked to another account.',
-      });
+    if (!config.WHATSAPP_ACCESS_TOKEN || !isPhoneAllowed(formattedNumber)) {
+      return res.status(403).json({ message: 'WhatsApp is available to invited numbers. You can link Telegram for delivery.' });
     }
-
-    // Determine eligibility from allowlist
-    const isEligible = isPhoneAllowed(formattedNumber);
-
-    const updatedUser = await User.findOneAndUpdate(
-      { clerkUserId },
-      {
-        $set: {
-          whatsappPhoneNumber: formattedNumber,
-          whatsappRegisteredAt: new Date(),
-          isWhatsAppEligible: isEligible,
-        },
-      },
-      { new: true, upsert: true }
-    );
-
-    const infoMessage = isEligible
-      ? "You're on the list! WhatsApp delivery is now active."
-      : "This number isn't on the current invite list. You're all set on Telegram — no changes needed.";
-
-    return res.status(200).json({
-      success: true,
-      registered: true,
-      phoneNumber: updatedUser.whatsappPhoneNumber,
-      isWhatsAppEligible: updatedUser.isWhatsAppEligible,
-      registeredAt: updatedUser.whatsappRegisteredAt,
-      message: infoMessage,
-    });
+    const code = randomBytes(8).toString('hex');
+    await User.updateOne({ clerkUserId }, { $set: {
+      whatsappPendingNumber: formattedNumber,
+      whatsappLinkCode: code,
+      whatsappLinkExpiry: new Date(Date.now() + 10 * 60_000),
+    } }, { upsert: true });
+    return res.json({ success: true, message: `Send “link ${code}” from this number to the desk’s WhatsApp account within 10 minutes, then check your connection below.` });
   } catch (err) {
     console.error(`[WhatsApp API] Error in /register-number: ${err.message}`);
     return res.status(500).json({
@@ -99,7 +70,7 @@ router.get('/status', requireClerkAuth, async (req, res) => {
     const clerkUserId = req.auth.userId;
     const user = await User.findOne({ clerkUserId }).lean();
 
-    if (!user || !user.whatsappPhoneNumber) {
+    if (!user?.whatsappVerifiedAt || !user.whatsappPhoneNumber) {
       return res.status(200).json({
         success: true,
         registered: false,
@@ -113,7 +84,7 @@ router.get('/status', requireClerkAuth, async (req, res) => {
       success: true,
       registered: true,
       phoneNumber: user.whatsappPhoneNumber,
-      isWhatsAppEligible: Boolean(user.isWhatsAppEligible),
+      isWhatsAppEligible: isPhoneAllowed(user.whatsappPhoneNumber),
       registeredAt: user.whatsappRegisteredAt,
     });
   } catch (err) {
@@ -134,33 +105,28 @@ router.get('/webhook', (req, res) => {
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  if (mode === 'subscribe' && token === config.WEBHOOK_VERIFY_TOKEN) {
+  if (mode === 'subscribe' && config.WEBHOOK_VERIFY_TOKEN && token === config.WEBHOOK_VERIFY_TOKEN) {
     console.log('[WhatsApp Webhook] Handshake verified successfully.');
     return res.status(200).send(challenge);
   }
 
-  console.warn(`[WhatsApp Webhook] Handshake failed. Expected token: ${config.WEBHOOK_VERIFY_TOKEN ? 'SET' : 'NOT SET'}, received: ${token}`);
+  console.warn('[WhatsApp Webhook] Handshake failed.');
   return res.status(403).send('Forbidden');
 });
 
-const mongoose = require('mongoose');
+
 
 /**
  * POST /api/whatsapp/webhook
  * Receives incoming WhatsApp messages & events from Meta.
  */
 router.post('/webhook', async (req, res) => {
-  // Acknowledge receipt to Meta immediately (Meta requires fast 200 response)
+  const secret = process.env.WHATSAPP_APP_SECRET;
+  if (!secret || !req.rawBody) return res.sendStatus(403);
+  const expected = Buffer.from('sha256=' + createHmac('sha256', secret).update(req.rawBody).digest('hex'));
+  const provided = Buffer.from(req.get('x-hub-signature-256') || '');
+  if (expected.length !== provided.length || !timingSafeEqual(expected, provided)) return res.sendStatus(403);
   res.status(200).send('EVENT_RECEIVED');
-
-  try {
-    if (mongoose.connection?.readyState === 1) {
-      await mongoose.connection.collection('whatsapp_webhook_logs').insertOne({
-        receivedAt: new Date(),
-        body: req.body,
-      });
-    }
-  } catch (_) {}
 
   try {
     const body = req.body;
@@ -194,14 +160,34 @@ router.post('/webhook', async (req, res) => {
     text = text.trim();
     if (!text) return;
 
-    console.log(`[WhatsApp Webhook] Message from ${from}: "${text}"`);
 
     const rawDigits = cleanPhoneNumber(from);
     const e164 = `+${rawDigits}`;
 
+    if (!isPhoneAllowed(e164)) return;
+    const link = /^link\s+([a-f0-9]{16})$/i.exec(text);
+    if (link) {
+      let confirmed = false;
+      try {
+        const result = await User.updateOne({
+          whatsappPendingNumber: e164, whatsappLinkCode: link[1].toLowerCase(),
+          whatsappLinkExpiry: { $gt: new Date() },
+        }, {
+          $set: { whatsappPhoneNumber: e164, whatsappVerifiedAt: new Date(), whatsappRegisteredAt: new Date(), isWhatsAppEligible: true },
+          $unset: { whatsappPendingNumber: '', whatsappLinkCode: '', whatsappLinkExpiry: '' },
+        });
+        confirmed = result.modifiedCount === 1;
+      } catch (err) {
+        if (err.code !== 11000) throw err;
+      }
+      await whatsappService.sendWhatsAppMessage(from, confirmed
+        ? 'WhatsApp delivery is connected.'
+        : 'Unable to link. Check the account and request a fresh code in your dashboard.');
+      return;
+    }
     // Find linked user by e164 or digits
     const user = await User.findOne({
-      whatsappPhoneNumber: { $in: [e164, rawDigits] },
+      whatsappPhoneNumber: { $in: [e164, rawDigits] }, whatsappVerifiedAt: { $type: 'date' },
     });
 
     if (!user) {
@@ -229,32 +215,6 @@ router.post('/webhook', async (req, res) => {
     console.log(`[WhatsApp Webhook] Reply sent to ${from}.`);
   } catch (err) {
     console.error(`[WhatsApp Webhook] Error processing event: ${err.message}`, err);
-    try {
-      if (mongoose.connection?.readyState === 1) {
-        await mongoose.connection.collection('whatsapp_webhook_logs').insertOne({
-          receivedAt: new Date(),
-          error: err.message,
-          stack: err.stack,
-        });
-      }
-    } catch (_) {}
-  }
-});
-
-/**
- * GET /api/whatsapp/recent-logs
- * Debug endpoint returning last 10 webhook events received by backend.
- */
-router.get('/recent-logs', async (req, res) => {
-  try {
-    const logs = await mongoose.connection.collection('whatsapp_webhook_logs')
-      .find({})
-      .sort({ receivedAt: -1 })
-      .limit(10)
-      .toArray();
-    return res.status(200).json({ count: logs.length, logs });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
   }
 });
 

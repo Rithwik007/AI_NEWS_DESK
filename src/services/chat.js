@@ -97,7 +97,7 @@ async function getRecentDigestArticles(userId, hours = 48) {
       const title = target.title || art.title || 'Untitled';
       const source = target.source || art.source || 'Unknown';
       const summary = art.summary || target.snippet || '';
-      const whyReadThis = art.whyReadThis || '';
+      const whyReadThis = art.publicRationale ? art.whyReadThis : '';
       const url = target.url || art.url || '';
 
       return `[Article ${i + 1}]
@@ -306,33 +306,6 @@ async function generateAndDeliverWelcomeDigest(user, targetId, channel) {
   scored.sort((a, b) => b.rankingScore - a.rankingScore);
   const top5 = scored.slice(0, 5);
 
-  // 5. CRITICAL: Persist as real ArticleRelevance records marked delivered BEFORE sending
-  const now = new Date();
-  const bulkOps = top5.map(({ article, bestRawSimilarity, rankingScore, matchedTopic, confidenceTier }) => ({
-    updateOne: {
-      filter: { userId, articleId: article._id },
-      update: {
-        $set: {
-          userId,
-          articleId: article._id,
-          bestRawSimilarity,
-          rankingScore,
-          matchedTopic,
-          isRelevant: true,
-          filteredReason: null,
-          confidenceTier,
-          deliveryStatus: 'delivered',
-          deliveredAt: now,
-          createdAt: now,
-        },
-      },
-      upsert: true,
-    },
-  }));
-
-  await ArticleRelevance.bulkWrite(bulkOps);
-  console.log(`[Welcome Digest] Persisted ${top5.length} ArticleRelevance records (delivered) for user "${userId}".`);
-
   // 6. Format and send welcome digest with unique conversational greeting
   const selectedArticles = top5.map(({ article, rankingScore, confidenceTier, matchedTopic }) => ({
     ...article,
@@ -353,6 +326,34 @@ async function generateAndDeliverWelcomeDigest(user, targetId, channel) {
 
   const welcomeHeader = `📰 *Your Welcome AI News Digest*\n\nHere are top stories matching your interests from the past 24 hours:\n\n`;
   await sendDigestMessages(selectedArticles, targetId, channel, welcomeHeader);
+
+  // Record delivery after the channel accepts the digest.
+  const now = new Date();
+  const bulkOps = top5.map(({ article, bestRawSimilarity, rankingScore, matchedTopic, confidenceTier }) => ({
+    updateOne: {
+      filter: { userId, articleId: article._id },
+      update: {
+        $set: {
+          userId,
+          articleId: article._id,
+          bestRawSimilarity,
+          rankingScore,
+          matchedTopic,
+          isRelevant: true,
+          filteredReason: null,
+          confidenceTier,
+          deliveryStatus: 'delivered',
+          deliveryChannel: channel,
+          deliveredAt: now,
+          createdAt: now,
+        },
+      },
+      upsert: true,
+    },
+  }));
+
+  await ArticleRelevance.bulkWrite(bulkOps);
+  console.log(`[Welcome Digest] Persisted ${top5.length} ArticleRelevance records (delivered) for user "${userId}".`);
 
   console.log(`[Welcome Digest] Successfully delivered welcome digest to user "${userId}" via ${channel}.`);
   return true;

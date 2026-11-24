@@ -1,3 +1,4 @@
+const { startOfDeskDay, currentEdition } = require('../utils/editionTime');
 const cron = require('node-cron');
 const { fetchAndDedup } = require('../pipeline/fetchAndDedup');
 const PipelineRun = require('../models/PipelineRun');
@@ -13,8 +14,7 @@ const { checkAllDeliveryWebhooks } = require('./webhookWatchdog');
  */
 async function checkMissedRun(runType) {
   try {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    const todayStart = startOfDeskDay();
 
     const run = await PipelineRun.findOne({
       runType,
@@ -75,6 +75,22 @@ async function checkMissedRun(runType) {
   }
 }
 
+// Recover the current edition when the host wakes after its scheduled minute.
+async function checkCurrentEdition(now = new Date()) {
+  const edition = currentEdition(now);
+  if (!edition) return;
+  try {
+    const recorded = await PipelineRun.exists({
+      runType: edition.runType, completedAt: { $gte: edition.scheduledAt },
+    });
+    if (!recorded) await fetchAndDedup({ runType: edition.runType });
+  } catch (err) {
+    if (err.code === 'PIPELINE_BUSY') return;
+    console.error('[Scheduler] Edition check failed:', err.message);
+    captureException(err, { tags: { component: 'scheduler', runType: edition.runType } });
+  }
+}
+
 /**
  * Starts the in-process twice-daily pipeline scheduler and watchdog.
  *
@@ -94,21 +110,8 @@ function initScheduler() {
 
   console.log('[Scheduler] Initializing twice-daily pipeline scheduler (Asia/Kolkata)...');
 
-  // Morning Run: 8:00 AM IST
-  cron.schedule(
-    '0 8 * * *',
-    async () => {
-      console.log('\n[Scheduler] ⏰ Triggering MORNING pipeline run (08:00 AM IST)...');
-      try {
-        await fetchAndDedup({ runType: 'morning' });
-        console.log('[Scheduler] ✓ Morning pipeline run finished successfully.');
-      } catch (err) {
-        console.error('[Scheduler] ✗ Morning pipeline run failed:', err.message);
-        captureException(err, { tags: { component: 'scheduler', runType: 'morning' } });
-      }
-    },
-    { timezone: 'Asia/Kolkata' }
-  );
+  cron.schedule('*/10 * * * *', () => checkCurrentEdition(), { timezone: 'Asia/Kolkata', noOverlap: true });
+  void checkCurrentEdition();
 
   // Morning Watchdog: 8:35 AM IST (35 min grace period)
   cron.schedule(
@@ -116,22 +119,6 @@ function initScheduler() {
     async () => {
       console.log('[Scheduler Watchdog] Checking morning run status (08:35 IST)...');
       await checkMissedRun('morning');
-    },
-    { timezone: 'Asia/Kolkata' }
-  );
-
-  // Evening Run: 6:00 PM IST
-  cron.schedule(
-    '0 18 * * *',
-    async () => {
-      console.log('\n[Scheduler] ⏰ Triggering EVENING pipeline run (06:00 PM IST)...');
-      try {
-        await fetchAndDedup({ runType: 'evening' });
-        console.log('[Scheduler] ✓ Evening pipeline run finished successfully.');
-      } catch (err) {
-        console.error('[Scheduler] ✗ Evening pipeline run failed:', err.message);
-        captureException(err, { tags: { component: 'scheduler', runType: 'evening' } });
-      }
     },
     { timezone: 'Asia/Kolkata' }
   );
@@ -198,4 +185,4 @@ function initScheduler() {
   console.log('[Scheduler] Scheduled: Morning (08:00 IST), Evening (18:00 IST), Watchdogs, Midnight Pruning, and Keep-Alive active.');
 }
 
-module.exports = { initScheduler, checkMissedRun };
+module.exports = { initScheduler, checkMissedRun, checkCurrentEdition };

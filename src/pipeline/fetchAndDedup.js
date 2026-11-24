@@ -1,4 +1,4 @@
-const { connectDB, disconnectDB } = require('../db/connect');
+const { connectDB } = require('../db/connect');
 const { fetchAllFeeds } = require('../services/fetchRSS');
 const { generateEmbeddings } = require('../services/embeddings');
 const { clusterArticles } = require('../services/dedup');
@@ -16,7 +16,22 @@ const config = require('../config');
  * Step 3: Dynamic Article Selection + Groq LLM Summarization & Reasoning
  * Step 4: Telegram Digest Delivery grouped by Confidence Tier
  */
+let running = false;
 async function fetchAndDedup(options = {}) {
+  if (running) {
+    const error = new Error('A pipeline run is already in progress.');
+    error.code = 'PIPELINE_BUSY';
+    throw error;
+  }
+  running = true;
+  try {
+    return await runPipeline(options);
+  } finally {
+    running = false;
+  }
+}
+
+async function runPipeline(options) {
   const startTime = Date.now();
   const runType = options.runType || config.RUN_TYPE || 'morning';
   options.runType = runType;
@@ -241,8 +256,7 @@ async function fetchAndDedup(options = {}) {
       },
     });
     throw pipelineErr;
-  } finally {
-    await disconnectDB();
+
   }
 }
 

@@ -8,54 +8,17 @@ const { requireClerkAuth } = require('../middleware/auth');
  * Idempotently syncs authenticated Clerk user into MongoDB User collection.
  * Creates a new User record if first time logging in, or returns existing record.
  */
-const InterestProfile = require('../models/InterestProfile');
-const ArticleRelevance = require('../models/ArticleRelevance');
-const TEST_USER_ID = 'user_3J9Rl5FHP3tYTNadS74NSmjwUZi';
-
 router.post('/sync', requireClerkAuth, async (req, res) => {
   try {
     const clerkUserId = req.auth.userId;
 
-    let user = await User.findOne({ clerkUserId });
-    let isNew = false;
-
-    if (!user) {
-      // Check if temporary test user has data to migrate
-      let carriedTelegramChatId = null;
-      let carriedTelegramLinkedAt = null;
-
-      if (clerkUserId !== TEST_USER_ID) {
-        const testUser = await User.findOne({ clerkUserId: TEST_USER_ID });
-        const testProfile = await InterestProfile.findOne({ userId: TEST_USER_ID });
-
-        if (testProfile) {
-          console.log(`[Auth API] Migrating InterestProfile and ArticleRelevance from ${TEST_USER_ID} to real user ${clerkUserId}...`);
-          await InterestProfile.updateOne({ userId: TEST_USER_ID }, { $set: { userId: clerkUserId } });
-          await ArticleRelevance.updateMany({ userId: TEST_USER_ID }, { $set: { userId: clerkUserId } });
-          console.log(`[Auth API] ✓ Reassigned InterestProfile and ArticleRelevance to real user ${clerkUserId}`);
-        }
-
-        if (testUser && testUser.telegramChatId) {
-          carriedTelegramChatId = testUser.telegramChatId;
-          carriedTelegramLinkedAt = testUser.telegramLinkedAt;
-          console.log(`[Auth API] Carrying over linked Telegram chat ID ${carriedTelegramChatId} to real user ${clerkUserId}`);
-          await User.deleteOne({ clerkUserId: TEST_USER_ID });
-          console.log(`[Auth API] Removed obsolete test user record (${TEST_USER_ID})`);
-        }
-      }
-
-      user = await User.create({
-        clerkUserId,
-        telegramChatId: carriedTelegramChatId,
-        telegramLinkCode: null,
-        telegramLinkCodeExpiry: null,
-        telegramLinkedAt: carriedTelegramLinkedAt,
-      });
-      isNew = true;
-      console.log(`[Auth API] Created and synced User record for real Clerk ID: ${clerkUserId}`);
-    } else {
-      console.log(`[Auth API] Synced existing User record for Clerk ID: ${clerkUserId}`);
-    }
+    const result = await User.findOneAndUpdate(
+      { clerkUserId },
+      { $setOnInsert: { clerkUserId } },
+      { upsert: true, new: true, includeResultMetadata: true }
+    );
+    const user = result.value;
+    const isNew = !result.lastErrorObject.updatedExisting;
 
     return res.status(isNew ? 201 : 200).json({
       success: true,

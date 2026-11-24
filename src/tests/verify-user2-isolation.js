@@ -1,10 +1,13 @@
+require('dotenv').config();
+if (!process.env.TEST_CLERK_USER_ID_2) throw new Error('Set TEST_CLERK_USER_ID_2 to a disposable Clerk test account ID.');
+if (!process.env.TEST_CLERK_USER_ID_3) throw new Error('Set TEST_CLERK_USER_ID_3 to a disposable Clerk test account ID.');
 const { connectDB, disconnectDB } = require('../db/connect');
 const InterestProfile = require('../models/InterestProfile');
 const ArticleRelevance = require('../models/ArticleRelevance');
 const Article = require('../models/Article');
 const { getEligibleTop5Articles } = require('../services/telegram');
 
-const USER_2_ID = 'user_3JEiVTkaMiLMxjxLMFeqJkv3FO8';
+const USER_2_ID = process.env.TEST_CLERK_USER_ID_3;
 
 async function verifyUser2() {
   console.log('=== VERIFYING USER 2 PROFILE & DATA ISOLATION ===\n');
@@ -39,7 +42,7 @@ async function verifyUser2() {
     distinctTopics.forEach((dt) => console.log(`  - "${dt}"`));
 
     // Confirm NONE of User 1's 9 topics appear in User 2's records
-    const user1Profile = await InterestProfile.findOne({ userId: 'user_3JEbz6SSqzGyAWyPDFRx7wvePp1' }).lean();
+    const user1Profile = await InterestProfile.findOne({ userId: process.env.TEST_CLERK_USER_ID_2 }).lean();
     const user1TopicStrings = new Set(user1Profile.topics.map(t => t.topic));
     const contaminated = distinctTopics.filter(dt => user1TopicStrings.has(dt));
     console.log(`Cross-contamination check (any User 1 topics in User 2 matchedTopic?): ${contaminated.length === 0 ? 'NONE (CLEAN)' : contaminated}`);

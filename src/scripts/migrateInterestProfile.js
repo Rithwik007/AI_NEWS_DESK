@@ -1,7 +1,9 @@
+require('dotenv').config();
+if (!process.env.TEST_CLERK_USER_ID) throw new Error('Set TEST_CLERK_USER_ID to a disposable Clerk test account ID.');
 const { connectDB, disconnectDB } = require('../db/connect');
 const InterestProfile = require('../models/InterestProfile');
 
-const TARGET_CLERK_USER_ID = 'user_3J9Rl5FHP3tYTNadS74NSmjwUZi';
+const TARGET_CLERK_USER_ID = process.env.TEST_CLERK_USER_ID;
 
 async function migrate() {
   console.log('=== ONE-TIME MIGRATION: InterestProfile Ownership ===');

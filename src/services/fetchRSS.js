@@ -1,14 +1,8 @@
 const RSSParser = require('rss-parser');
 const config = require('../config');
 
-// Standard parser with realistic user agent and timeout
-const parser = new RSSParser({
-  headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 AI-News-Bot/1.0 (by /u/newsbot)',
-    'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-  },
-  timeout: 12000,
-});
+const parser = new RSSParser();
+const headers = { 'User-Agent': 'AI-News-Delivery-Pipeline/1.0', Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, */*' };
 
 /**
  * Strip HTML tags from RSS description fields.
@@ -41,11 +35,15 @@ function isWithinTimeWindow(dateStr) {
 async function fetchRSSWithRetry(source, maxRetries = 1) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const parsed = await parser.parseURL(source.url);
-      return parsed;
+      const response = await fetch(source.url, { headers, signal: AbortSignal.timeout(12000) });
+      if (!response.ok) {
+        await response.body?.cancel();
+        throw new Error(`Feed HTTP ${response.status}`);
+      }
+      return await parser.parseString(await response.text());
     } catch (error) {
       const isRateLimited = error.message && (error.message.includes('429') || error.message.includes('Status code 429'));
-      const isTimeout = error.message && (error.message.includes('timeout') || error.message.includes('ETIMEDOUT'));
+      const isTimeout = error.name === 'TimeoutError' || error.cause?.code === 'ETIMEDOUT';
 
       if ((isRateLimited || isTimeout) && attempt < maxRetries) {
         const delayMs = 3000;
@@ -69,12 +67,7 @@ async function fetchAlgoliaHN(source) {
 
   const url = `${source.url}?tags=${tags}&query=${query}&numericFilters=${encodeURIComponent(`points>=${minPoints},created_at_i>${cutoffSeconds}`)}&hitsPerPage=50`;
 
-  const fetchFn = globalThis.fetch || require('node-fetch');
-  const response = await fetchFn(url, {
-    headers: {
-      'User-Agent': 'AI-News-Delivery-Pipeline/1.0',
-    },
-  });
+  const response = await fetch(url, { headers, signal: AbortSignal.timeout(12000) });
 
   if (!response.ok) {
     throw new Error(`Algolia API HTTP ${response.status}: ${response.statusText}`);
@@ -100,6 +93,7 @@ async function fetchAlgoliaHN(source) {
  */
 async function fetchAllFeeds() {
   const allArticles = [];
+  let successfulSources = 0;
   const sources = config.NEWS_SOURCES || config.RSS_FEEDS;
 
   for (const source of sources) {
@@ -110,9 +104,11 @@ async function fetchAllFeeds() {
 
       if (source.type === 'algolia-api') {
         articlesFromSource = await fetchAlgoliaHN(source);
+        successfulSources++;
       } else {
         // Default to RSS
         const parsed = await fetchRSSWithRetry(source, 1);
+        successfulSources++;
 
         if (!parsed.items || parsed.items.length === 0) {
           console.warn(`[Source] ⚠ ${source.name}: returned 0 items, skipping`);
@@ -142,6 +138,7 @@ async function fetchAllFeeds() {
     }
   }
 
+  if (!successfulSources) throw new Error('No configured news source responded successfully.');
   console.log(`[Source] Total articles fetched across all sources: ${allArticles.length}`);
   return allArticles;
 }

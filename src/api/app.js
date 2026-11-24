@@ -26,14 +26,10 @@ function createApp() {
     cors({
       origin: function (origin, callback) {
         if (!origin) return callback(null, true);
-        if (
-          allowedOrigins.includes(origin) ||
-          origin.endsWith('.vercel.app') ||
-          origin.includes('localhost')
-        ) {
+        if (allowedOrigins.includes(origin)) {
           return callback(null, true);
         }
-        return callback(new Error('Not allowed by CORS'));
+        return callback(null, false);
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -41,7 +37,11 @@ function createApp() {
     })
   );
 
-  app.use(express.json());
+  app.use(express.json({
+    verify(req, res, buffer) {
+      if (req.path === '/api/whatsapp/webhook') req.rawBody = buffer;
+    },
+  }));
 
   // Attach Clerk auth context to all requests (verifies session tokens if provided)
   app.use(clerkMiddleware());
@@ -80,15 +80,6 @@ function createApp() {
       database: dbStatusMap[dbState] || 'unknown',
       timestamp: new Date(),
     });
-  });
-
-  // Sentry debug test endpoint
-  app.get('/api/debug/sentry-test', (req, res, next) => {
-    const { captureMessage, captureException } = require('../services/sentry');
-    captureMessage('[Sentry Test] Manual test message from /api/debug/sentry-test', 'warning');
-    const err = new Error('Sentry Test Error — triggered via /api/debug/sentry-test');
-    captureException(err, { tags: { test: true } });
-    next(err);
   });
 
   // Serve production frontend build if available

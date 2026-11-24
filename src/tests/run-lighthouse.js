@@ -12,7 +12,7 @@ async function run() {
     const options = {
       logLevel: 'info',
       output: 'json',
-      onlyCategories: ['pwa'],
+      onlyCategories: ['accessibility', 'best-practices', 'performance'],
       port: chrome.port,
     };
 
@@ -20,40 +20,15 @@ async function run() {
     
     // Save report
     const reportJson = runnerResult.report;
-    const outputPath = path.resolve('lighthouse-pwa-report.json');
+    const outputPath = path.resolve('lighthouse-report.json');
     fs.writeFileSync(outputPath, reportJson);
     console.log('[Lighthouse] Report written to', outputPath);
 
     const lhr = runnerResult.lhr;
     console.log('--- LIGHTHOUSE AUDIT RESULT ---');
     console.log('Categories:', Object.keys(lhr.categories));
-    if (lhr.categories.pwa) {
-      console.log('PWA Score:', lhr.categories.pwa.score);
-      console.log('\nAudit Checklist:');
-      for (const auditRef of lhr.categories.pwa.auditRefs) {
-        const audit = lhr.audits[auditRef.id];
-        if (audit) {
-          console.log(`[${audit.score === 1 ? 'PASS' : audit.score === 0 ? 'FAIL' : 'INFO'}] ${audit.title}: ${audit.displayValue || (audit.score === 1 ? 'Passed' : audit.explanation || 'See details')}`);
-        }
-      }
-    } else {
-      console.log('No PWA category in LHR. Checking individual PWA audits...');
-      const pwaAudits = [
-        'installable-manifest',
-        'service-worker',
-        'splash-screen',
-        'themed-omnibox',
-        'content-width',
-        'viewport',
-        'apple-touch-icon',
-        'maskable-icon',
-      ];
-      for (const id of pwaAudits) {
-        const audit = lhr.audits[id];
-        if (audit) {
-          console.log(`[${audit.score === 1 ? 'PASS' : audit.score === 0 ? 'FAIL' : 'INFO'}] ${audit.title} (${id}): ${audit.displayValue || (audit.score === 1 ? 'Passed' : audit.explanation || audit.description)}`);
-        }
-      }
+    for (const category of Object.values(lhr.categories)) {
+      console.log(`${category.title}: ${Math.round(category.score * 100)}`);
     }
   } finally {
     try {
@@ -64,4 +39,4 @@ async function run() {
   }
 }
 
-run().catch(console.error);
+run().catch(err => { console.error(err); process.exitCode = 1; });

@@ -86,32 +86,22 @@ async function verifyAndLinkTelegramCode(rawCode, chatId) {
   const normalizedCode = rawCode.trim().toUpperCase();
   const normalizedChatId = String(chatId).trim();
 
-  // Find user with this active code
-  const user = await User.findOne({ telegramLinkCode: normalizedCode });
-
+  const now = new Date();
+  const user = await User.findOneAndUpdate(
+    { telegramLinkCode: normalizedCode, telegramLinkCodeExpiry: { $gt: now } },
+    { $set: { telegramChatId: normalizedChatId, telegramLinkedAt: now, telegramLinkCode: null, telegramLinkCodeExpiry: null } },
+    { new: true }
+  );
   if (!user) {
+    const expired = await User.exists({ telegramLinkCode: normalizedCode });
     return {
       success: false,
-      reason: 'INVALID_CODE',
-      message: '❌ Invalid link code. Please generate a new code from the web dashboard.',
+      reason: expired ? 'EXPIRED_CODE' : 'INVALID_CODE',
+      message: expired
+        ? 'This code has expired. Generate a fresh code in your dashboard.'
+        : 'Invalid link code. Generate a new code in your dashboard.',
     };
   }
-
-  // Check expiration
-  if (!user.telegramLinkCodeExpiry || user.telegramLinkCodeExpiry < new Date()) {
-    return {
-      success: false,
-      reason: 'EXPIRED_CODE',
-      message: '⏳ This link code has expired (10-minute limit). Please generate a fresh code from the web dashboard.',
-    };
-  }
-
-  // Valid: link chat ID and consume code
-  user.telegramChatId = normalizedChatId;
-  user.telegramLinkedAt = new Date();
-  user.telegramLinkCode = null;
-  user.telegramLinkCodeExpiry = null;
-  await user.save();
 
   return {
     success: true,

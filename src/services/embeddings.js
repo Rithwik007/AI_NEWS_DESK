@@ -24,15 +24,12 @@ async function getExtractor() {
 
   console.log(`[Embedding] Loading model: ${config.EMBEDDING_MODEL} (first run downloads ~23MB)...`);
 
-  // Dynamic import — @huggingface/transformers is ESM
-  const { pipeline } = await import('@huggingface/transformers');
-
-  extractorPipeline = await pipeline('feature-extraction', config.EMBEDDING_MODEL, {
-    // Quantized model for faster loading + smaller footprint
-    dtype: 'q8',
-  });
-
-  console.log('[Embedding] Model loaded successfully');
+  extractorPipeline = import('@huggingface/transformers')
+    .then(({ pipeline }) => pipeline('feature-extraction', config.EMBEDDING_MODEL, { dtype: 'q8' }))
+    .catch(err => {
+      extractorPipeline = null;
+      throw err;
+    });
   return extractorPipeline;
 }
 

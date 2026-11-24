@@ -1,43 +1,19 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ClerkProvider } from '@clerk/clerk-react';
-
-import AppLayout from './components/AppLayout';
+import React, { lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import FrontPage from './pages/FrontPage';
 import OfflineBanner from './components/OfflineBanner';
-import Login from './pages/Login';
-import SignUpPage from './pages/SignUpPage';
-import DigestSchedule from './pages/DigestSchedule';
-import TelegramConnect from './pages/TelegramConnect';
-import InterestEditor from './pages/InterestEditor';
-import NotFound from './pages/NotFound';
+import Spinner from './components/Spinner';
 
-const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const AccountRoutes = lazy(() => import('./AccountRoutes'));
 
 export default function App() {
   return (
-    <ClerkProvider
-      publishableKey={clerkPubKey}
-      signInUrl="/login"
-      signUpUrl="/sign-up"
-      fallbackRedirectUrl="/login"
-    >
+    <BrowserRouter>
       <OfflineBanner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login/*" element={<Login />} />
-          <Route path="/sign-up/*" element={<SignUpPage />} />
-
-          <Route path="/" element={<AppLayout />}>
-            <Route index element={<Navigate to="/digest" replace />} />
-            <Route path="digest" element={<DigestSchedule />} />
-            <Route path="interests" element={<InterestEditor />} />
-            <Route path="channels" element={<TelegramConnect />} />
-            <Route path="telegram" element={<Navigate to="/channels" replace />} />
-          </Route>
-
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </ClerkProvider>
+      <Routes>
+        <Route path="/" element={<FrontPage />} />
+        <Route path="*" element={<Suspense fallback={<Spinner />}><AccountRoutes /></Suspense>} />
+      </Routes>
+    </BrowserRouter>
   );
 }

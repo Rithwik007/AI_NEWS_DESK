@@ -1,5 +1,6 @@
+const { startOfDeskDay } = require('../utils/editionTime');
 const config = require('../config');
-const { sendWhatsAppTemplate } = require('./whatsapp');
+const { sendWhatsAppTemplate, isPhoneAllowed } = require('./whatsapp');
 
 /**
  * Escape special Markdown (v1) characters in text.
@@ -40,7 +41,7 @@ function formatArticleEntry(article, index) {
   const url = (target.url || article.url || '').trim();
   const source = (target.source || article.source || '').trim();
   const summary = (article.summary || '').trim();
-  const whyReadThis = (article.whyReadThis || '').trim();
+  const whyReadThis = article.publicRationale ? (article.whyReadThis || '').trim() : '';
 
   const titleLink = url ? `[${escapeMarkdown(title)}](${safeUrl(url)})` : `*${escapeMarkdown(title)}*`;
   const sourceTag = source ? ` _(${escapeMarkdown(source)})_` : '';
@@ -211,8 +212,7 @@ async function deliverTopStoriesMultiUser(options = {}) {
   // In evening mode: determine timestamp of last successful morning run for today
   let morningCutoff = null;
   if (runType === 'evening') {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
+    const todayStart = startOfDeskDay();
 
     const lastMorningRun = await PipelineRun.findOne({
       runType: 'morning',
@@ -233,7 +233,7 @@ async function deliverTopStoriesMultiUser(options = {}) {
     ? { clerkUserId: options.userId }
     : {
         $or: [
-          { whatsappPhoneNumber: { $ne: null } },
+          { whatsappVerifiedAt: { $type: 'date' } },
           { telegramChatId: { $ne: null } },
         ],
       };
@@ -349,7 +349,7 @@ async function deliverTopStoriesMultiUser(options = {}) {
     // 1. WhatsApp-First Delivery:
     // If user has registered WhatsApp phone AND isWhatsAppEligible:
     // Attempt WhatsApp delivery FIRST (template push for scheduled runs).
-    const isWhatsAppTarget = Boolean(user.isWhatsAppEligible && user.whatsappPhoneNumber);
+    const isWhatsAppTarget = Boolean(user.whatsappVerifiedAt && isPhoneAllowed(user.whatsappPhoneNumber));
 
     if (isWhatsAppTarget) {
       channelStats.whatsapp.attempted++;

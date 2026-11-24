@@ -34,7 +34,7 @@ export default function SignUpPage() {
   }, [isLoaded, isSignedIn, getToken, navigate]);
 
   return (
-    <div
+    <div className="auth-page"
       style={{
         minHeight: '100vh',
         display: 'flex',

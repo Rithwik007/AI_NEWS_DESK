@@ -42,7 +42,7 @@ async function smokeTestChannels() {
 
     // 2. WhatsApp registration & eligibility
     console.log('\n[Test 2] Testing WhatsApp number registration & eligibility check...');
-    const testEligiblePhone = '+917013560134';
+    const testEligiblePhone = '+910000000134';
     const isEligible = isPhoneAllowed(testEligiblePhone);
     const updated = await User.findOneAndUpdate(
       { clerkUserId: testUserId },

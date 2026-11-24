@@ -3,6 +3,7 @@
  *
  * Runs full pipeline: Fetch → Dedup → Relevance Filter → Summarize → Telegram Delivery.
  */
+const { disconnectDB } = require('./db/connect');
 const { fetchAndDedup } = require('./pipeline/fetchAndDedup');
 
 async function main() {
@@ -21,7 +22,9 @@ async function main() {
   } catch (error) {
     console.error('[Main] Pipeline failed:', error.message);
     console.error(error.stack);
-    process.exit(1);
+    process.exitCode = 1;
+  } finally {
+    await disconnectDB();
   }
 }
 

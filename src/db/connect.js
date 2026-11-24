@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const config = require('../config');
 
+let closing = false;
 let _reconnecting = false;
 let _connectionPromise = null;
 
@@ -27,7 +28,7 @@ async function connectDB() {
         maxPoolSize: 10,                 // Up to 10 connections
         minPoolSize: 1,                  // Keep at least 1 socket alive
       });
-      console.log('[DB] Connected to MongoDB Atlas (readyState: 1)');
+      console.log('[DB] Connected to MongoDB (readyState: 1)');
       return mongoose.connection;
     } catch (error) {
       console.error('[DB] Failed to connect to MongoDB:', error.message);
@@ -57,6 +58,7 @@ async function ensureDBConnected() {
 
 // Global connection event handlers for visibility and auto-recovery
 mongoose.connection.on('disconnected', async () => {
+  if (closing) return;
   console.warn('[DB] MongoDB connection lost — scheduling immediate auto-reconnect...');
   if (!_reconnecting) {
     _reconnecting = true;
@@ -84,7 +86,12 @@ mongoose.connection.on('error', (err) => {
  * Gracefully close MongoDB connection.
  */
 async function disconnectDB() {
-  await mongoose.disconnect();
+  closing = true;
+  try {
+    await mongoose.disconnect();
+  } finally {
+    closing = false;
+  }
   console.log('[DB] Disconnected from MongoDB');
 }
 

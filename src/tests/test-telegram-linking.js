@@ -1,6 +1,8 @@
 const { connectDB, disconnectDB } = require('../db/connect');
 const User = require('../models/User');
-const config = require('../config');
+const { mock } = require('node:test');
+const transport = require('../services/telegram');
+mock.method(transport, 'sendTelegramMessage', async () => ({ ok: true }));
 const { generateTelegramLinkCode, verifyAndLinkTelegramCode } = require('../services/telegramAuth');
 const { processTelegramUpdate } = require('../services/telegramWebhook');
 
@@ -9,7 +11,7 @@ async function runTests() {
   await connectDB();
 
   const testUserId = 'clerk_test_alpha_01';
-  const realChatId = config.TELEGRAM_CHAT_ID; // 7106031577
+  const realChatId = '100001';
 
   try {
     // Clean prior test artifacts
@@ -82,7 +84,7 @@ async function runTests() {
     if (linkedUser.telegramLinkCodeExpiry !== null) {
       throw new Error('telegramLinkCodeExpiry was not cleared');
     }
-    console.log('✓ Linking verified: telegramChatId populated, code cleared, linkedAt set, Telegram reply sent\n');
+    console.log('✓ Linking verified: telegramChatId populated, code cleared, linkedAt set, Telegram transport mocked\n');
 
     // --- TEST 3: Reused Code Rejection ---
     console.log('--- TEST 3: Reused Code Rejection ---');

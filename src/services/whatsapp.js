@@ -41,7 +41,7 @@ function formatWhatsAppArticleEntry(article, index) {
   const url = (target.url || article.url || '').trim();
   const source = (target.source || article.source || '').trim();
   const summary = (article.summary || '').trim();
-  const whyReadThis = (article.whyReadThis || '').trim();
+  const whyReadThis = article.publicRationale ? (article.whyReadThis || '').trim() : '';
 
   const sourceTag = source ? ` _(${source})_` : '';
   let entry = `*${index}. ${title}*${sourceTag}\n`;
