@@ -34,6 +34,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
+      'import.meta.env.VITE_DESK_PROXY': JSON.stringify(
+        env.VERCEL === '1' && env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '') === 'https://ai-news-backend-rmdj.onrender.com'
+      ),
       'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': JSON.stringify(clerkKey),
       'import.meta.env.VITE_POSTHOG_KEY': JSON.stringify(posthogKey),
       'import.meta.env.VITE_POSTHOG_HOST': JSON.stringify(posthogHost),

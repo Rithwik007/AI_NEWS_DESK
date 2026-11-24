@@ -255,6 +255,14 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 - **Verification performed.** All seven tests passed. Render served revision 16097fa with MongoDB connected, and Telegram accepted registration after the server accepted a signed empty update. A browser preflight then identified a missing dashboard origin. The known public frontend is now allowed on its paired Render hostname, while other hosts retain their own origin settings.
 - **Bugs found and fixed.** An optional integration could prevent the entire API from starting, and a working Telegram bot required a second manually synchronized credential.
 
+### 2026-11-24 — Login return and dashboard connectivity
+
+- **What was built.** The homepage recognizes an active Clerk session. Sign-in and sign-up return to the desk, where channel status determines the destination. The hosted dashboard sends authenticated API requests through a same-origin Vercel rewrite to the existing Render API.
+- **Why.** The public homepage previously sat outside Clerk, the login fallback pointed back at login and two separate page effects made duplicate API requests before navigation. Direct cross-origin requests also depended on a successful browser preflight.
+- **How it works.** Self-hosted API URLs and the local development proxy retain their existing behavior. The service worker fetches current HTML on navigation. A failed interest load offers a retry before editing. International phone numbers pasted with a leading plus preserve their country code.
+- **Verification performed.** Production build and route checks are recorded in the release handoff.
+- **Bugs found and fixed.** Redirects no longer require returning visitors to open their desk manually. An unsuccessful profile load no longer presents an empty editable profile, and the country selector no longer duplicates an international prefix.
+
 ## 5. Known Limitations & Backlog (Not Yet Resolved)
 1. **PWA Service Worker Stale-Cache**:
    - Service worker caches the application shell. A frontend rebuild on Vercel may require a hard refresh on mobile if cached assets are held.

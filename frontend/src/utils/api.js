@@ -8,6 +8,10 @@ import { getAuthToken } from './auth';
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 
 export function apiUrl(endpoint) {
+  // The Vercel deployment proxies its configured Render API on the dashboard origin.
+  if (import.meta.env.VITE_DESK_PROXY && endpoint.startsWith('/api/')) {
+    return '/api/desk/' + endpoint.slice(5);
+  }
   if (!API_BASE_URL) return endpoint;
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   return `${API_BASE_URL}${path}`;
@@ -71,6 +75,7 @@ export async function apiFetch(endpoint, options = {}, getTokenFn = null) {
   if (contentType && contentType.includes('application/json')) {
     data = await response.json();
   } else {
+    if (response.ok) throw new Error('The news desk API returned an unexpected response. Please retry.');
     data = await response.text();
   }
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, useUser, useClerk } from '@clerk/clerk-react';
 import { apiFetch } from '../utils/api';
 import { identifyUser, trackPageView, resetAnalytics } from '../utils/analytics';
@@ -34,12 +34,7 @@ export default function AppLayout() {
   }, [user]);
 
   useEffect(() => {
-    if (isLoaded && !isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-
-    if (isAuthenticated) {
+    if (isLoaded && isAuthenticated) {
       // Sync user and check delivery channel statuses
       async function syncAndCheck() {
         setSyncing(true);
@@ -67,7 +62,7 @@ export default function AppLayout() {
 
       syncAndCheck();
     }
-  }, [isLoaded, isAuthenticated, getToken, navigate]);
+  }, [isLoaded, isAuthenticated, getToken]);
 
   if (!isLoaded || (isAuthenticated && syncing)) {
     return (
@@ -91,7 +86,7 @@ export default function AppLayout() {
   }
 
   if (isLoaded && !isAuthenticated) {
-    return null;
+    return <Navigate to="/login" replace />;
   }
 
   return (

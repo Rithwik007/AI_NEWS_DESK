@@ -1,6 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { ClerkProvider } from '@clerk/clerk-react';
+import { Routes, Route, Navigate, useOutletContext } from 'react-router-dom';
 
 import AppLayout from './components/AppLayout';
 import Login from './pages/Login';
@@ -12,6 +11,11 @@ import NotFound from './pages/NotFound';
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
+function DeskEntry() {
+  const { deliveryConnected } = useOutletContext();
+  return <Navigate to={deliveryConnected ? '/interests' : '/channels'} replace />;
+}
+
 export default function AccountRoutes() {
   if (!clerkPubKey) return (
     <main className="setup-note">
@@ -21,25 +25,19 @@ export default function AccountRoutes() {
     </main>
   );
   return (
-    <ClerkProvider
-      publishableKey={clerkPubKey}
-      signInUrl="/login"
-      signUpUrl="/sign-up"
-      fallbackRedirectUrl="/login"
-    >
-      <Routes>
-        <Route path="/login/*" element={<Login />} />
-        <Route path="/sign-up/*" element={<SignUpPage />} />
+    <Routes>
+      <Route path="/login/*" element={<Login />} />
+      <Route path="/sign-up/*" element={<SignUpPage />} />
 
-        <Route path="/" element={<AppLayout />}>
-          <Route path="digest" element={<DigestSchedule />} />
-          <Route path="interests" element={<InterestEditor />} />
-          <Route path="channels" element={<TelegramConnect />} />
-          <Route path="telegram" element={<Navigate to="/channels" replace />} />
-        </Route>
+      <Route path="/" element={<AppLayout />}>
+        <Route path="desk" element={<DeskEntry />} />
+        <Route path="digest" element={<DigestSchedule />} />
+        <Route path="interests" element={<InterestEditor />} />
+        <Route path="channels" element={<TelegramConnect />} />
+        <Route path="telegram" element={<Navigate to="/channels" replace />} />
+      </Route>
 
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </ClerkProvider>
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   );
 }

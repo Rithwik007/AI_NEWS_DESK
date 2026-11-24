@@ -1,39 +1,22 @@
-import React, { useEffect } from 'react';
-import { SignIn, useAuth } from '@clerk/clerk-react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { apiFetch } from '../utils/api';
+import React from 'react';
+import { SignIn, useAuth, useClerk } from '@clerk/clerk-react';
+import { Navigate, Link, useLocation } from 'react-router-dom';
 import Spinner from '../components/Spinner';
 
 export default function Login() {
-  const { isSignedIn, isLoaded, getToken } = useAuth();
-  const navigate = useNavigate();
+  const { isSignedIn, isLoaded } = useAuth();
+  const { signOut } = useClerk();
   const location = useLocation();
   const isExpired = new URLSearchParams(location.search).get('expired') === '1';
 
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
-
-    async function handlePostLogin() {
-      try {
-        // 1. Sync Clerk user to backend User collection
-        await apiFetch('/api/auth/sync', { method: 'POST' }, getToken);
-
-        // 2. Check if user already has Telegram linked
-        const statusData = await apiFetch('/api/telegram/status', {}, getToken);
-
-        if (statusData && statusData.linked) {
-          navigate('/interests');
-        } else {
-          navigate('/telegram');
-        }
-      } catch (err) {
-        console.error('[Login] Redirect check failed:', err);
-        navigate('/interests');
-      }
-    }
-
-    handlePostLogin();
-  }, [isLoaded, isSignedIn, getToken, navigate]);
+  if (isLoaded && isSignedIn && isExpired) {
+    return <main className="setup-note">
+      <h1>Sign in again</h1>
+      <p>Your desk could not verify this session.</p>
+      <button className="btn-primary" onClick={() => signOut({ redirectUrl: '/login' })}>Return to sign in</button>
+    </main>;
+  }
+  if (isLoaded && isSignedIn) return <Navigate to="/desk" replace />;
 
   return (
     <div className="auth-page"

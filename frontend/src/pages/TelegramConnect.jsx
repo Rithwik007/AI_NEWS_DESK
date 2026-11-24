@@ -49,7 +49,7 @@ export default function TelegramConnect() {
   const { setTelegramLinked, setWhatsappEligible } = useOutletContext() || {};
 
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState({ linked: false, telegramChatId: null, linkedAt: null });
+  const [status, setStatus] = useState({ linked: null, telegramChatId: null, linkedAt: null });
   const [codeData, setCodeData] = useState(null); // { code, expiry }
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState(null);
@@ -215,11 +215,12 @@ export default function TelegramConnect() {
     setWaSuccess(null);
 
     try {
-      const cleanDigits = nationalNumber.replace(/\D/g, '');
-      if (cleanDigits.length < 5 || cleanDigits.length > 15) {
-        throw new Error('Please enter valid phone number digits (no symbols or spaces needed)');
+      const input = nationalNumber.trim();
+      const digits = input.replace(/[^0-9]/g, '');
+      const fullPhoneNumber = input.startsWith('+') ? '+' + digits : countryCode + digits;
+      if (!/^\+[1-9]\d{6,14}$/.test(fullPhoneNumber)) {
+        throw new Error('Enter a valid phone number, including its country code when pasting an international number.');
       }
-      const fullPhoneNumber = `${countryCode}${cleanDigits}`;
 
       const data = await apiFetch(
         '/api/whatsapp/register-number',
@@ -515,7 +516,7 @@ export default function TelegramConnect() {
             id="telegram-status-pill"
           >
             <span className="status-indicator-dot" />
-            <span>{status.linked ? 'Connected' : 'Not linked'}</span>
+            <span>{status.linked === null ? 'Status unavailable' : status.linked ? 'Connected' : 'Not linked'}</span>
           </div>
         </div>
 
@@ -532,6 +533,7 @@ export default function TelegramConnect() {
             }}
           >
             {error}
+            <button type="button" className="btn-secondary" onClick={lastAction === 'check' ? checkStatus : handleGenerateCode}>Try again</button>
           </div>
         )}
 

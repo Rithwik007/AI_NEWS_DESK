@@ -1,4 +1,4 @@
-const CACHE_NAME = 'newsdesk-shell-v3';
+const CACHE_NAME = 'newsdesk-shell-v4';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
@@ -36,6 +36,12 @@ self.addEventListener('fetch', (event) => {
 
   // Skip caching for API calls (always live network)
   if (url.origin !== self.location.origin || url.pathname.startsWith('/api') || event.request.method !== 'GET') {
+    return;
+  }
+
+  // Fetch the latest HTML on navigation so returning users enter the current auth flow.
+  if (event.request.mode === 'navigate') {
+    event.respondWith(fetch(event.request).catch(() => caches.match('/index.html')));
     return;
   }
 

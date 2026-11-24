@@ -1,6 +1,10 @@
 {
   "framework": "vite",
+  "headers": [
+    { "source": "/api/desk/:path*", "headers": [{ "key": "Cache-Control", "value": "private, no-store" }] }
+  ],
   "rewrites": [
+    { "source": "/api/desk/:path*", "destination": "https://ai-news-backend-rmdj.onrender.com/api/:path*" },
     {
       "source": "/(.*)",
       "destination": "/index.html"

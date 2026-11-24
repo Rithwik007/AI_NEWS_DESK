@@ -1,37 +1,12 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { SignUp, useAuth } from '@clerk/clerk-react';
-import { useNavigate, Link } from 'react-router-dom';
-import { apiFetch } from '../utils/api';
+import { Navigate, Link } from 'react-router-dom';
 import Spinner from '../components/Spinner';
 
 export default function SignUpPage() {
-  const { isSignedIn, isLoaded, getToken } = useAuth();
-  const navigate = useNavigate();
+  const { isSignedIn, isLoaded } = useAuth();
 
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
-
-    async function handlePostSignUp() {
-      try {
-        // 1. Sync Clerk user to backend User collection
-        await apiFetch('/api/auth/sync', { method: 'POST' }, getToken);
-
-        // 2. Check if user already has Telegram linked
-        const statusData = await apiFetch('/api/telegram/status', {}, getToken);
-
-        if (statusData && statusData.linked) {
-          navigate('/interests');
-        } else {
-          navigate('/telegram');
-        }
-      } catch (err) {
-        console.error('[SignUp] Post-signup check failed:', err);
-        navigate('/interests');
-      }
-    }
-
-    handlePostSignUp();
-  }, [isLoaded, isSignedIn, getToken, navigate]);
+  if (isLoaded && isSignedIn) return <Navigate to="/desk" replace />;
 
   return (
     <div className="auth-page"
