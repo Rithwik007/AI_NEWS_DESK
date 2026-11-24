@@ -78,6 +78,7 @@ function createApp() {
     res.json({
       status: dbState === 1 ? 'ok' : 'degraded',
       database: dbStatusMap[dbState] || 'unknown',
+      revision: process.env.RENDER_GIT_COMMIT || undefined,
       timestamp: new Date(),
     });
   });

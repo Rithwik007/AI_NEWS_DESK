@@ -349,7 +349,7 @@ async function deliverTopStoriesMultiUser(options = {}) {
     // 1. WhatsApp-First Delivery:
     // If user has registered WhatsApp phone AND isWhatsAppEligible:
     // Attempt WhatsApp delivery FIRST (template push for scheduled runs).
-    const isWhatsAppTarget = Boolean(user.whatsappVerifiedAt && isPhoneAllowed(user.whatsappPhoneNumber));
+    const isWhatsAppTarget = Boolean(process.env.WHATSAPP_APP_SECRET && user.whatsappVerifiedAt && isPhoneAllowed(user.whatsappPhoneNumber));
 
     if (isWhatsAppTarget) {
       channelStats.whatsapp.attempted++;

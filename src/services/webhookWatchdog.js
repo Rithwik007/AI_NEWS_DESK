@@ -87,6 +87,7 @@ async function checkTelegramWebhookHealth(options = {}) {
  */
 async function checkWhatsAppWebhookHealth() {
   if (!config.WHATSAPP_ACCESS_TOKEN) return { healthy: true, skipped: true, details: {} };
+  if (!process.env.WHATSAPP_APP_SECRET) return { healthy: false, reason: 'WHATSAPP_APP_SECRET missing', details: {} };
   const issues = [];
   const details = {};
 

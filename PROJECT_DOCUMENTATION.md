@@ -247,6 +247,14 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 - **Verification performed.** The deployed frontend and API health returned HTTP 200. The frontend bundle contained Clerk, Sentry and PostHog configuration. Telegram reported the expected webhook URL and an empty update queue. Provider-side authentication checks identified one rejected credential in the local Groq pool. The private cron history and telemetry ingestion were not independently confirmed.
 - **Bugs found and fixed.** The examples omitted supported failover and reporting variables. The prior operational notes overstated the availability guarantee of a keep-alive job.
 
+### 2026-11-24 — Render startup recovery
+
+- **What was built.** Isolated a missing Meta signing secret to WhatsApp and exposed the deployed Git revision in API health on Render.
+- **Why.** Render successfully built the release but exited during environment validation with two missing webhook credentials.
+- **How it works.** Telegram registration and request verification use a domain-separated HMAC of the bot token by default. An explicit webhook secret still takes precedence. Without a Meta app secret, WhatsApp rejects incoming messages, pauses registration and skips scheduled WhatsApp delivery.
+- **Verification performed.** See the deployment handoff for runtime checks.
+- **Bugs found and fixed.** An optional integration could prevent the entire API from starting, and a working Telegram bot required a second manually synchronized credential.
+
 ## 5. Known Limitations & Backlog (Not Yet Resolved)
 1. **PWA Service Worker Stale-Cache**:
    - Service worker caches the application shell. A frontend rebuild on Vercel may require a hard refresh on mobile if cached assets are held.

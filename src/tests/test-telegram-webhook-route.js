@@ -22,6 +22,8 @@ test('delivery endpoints validate provider credentials before accepting updates'
   assert.equal((await post('/telegram/webhook')).status, 403);
   config.TELEGRAM_WEBHOOK_SECRET = 'fixture';
   assert.equal((await post('/telegram/webhook', { 'x-telegram-bot-api-secret-token': 'fixture' })).status, 200);
+  delete process.env.WHATSAPP_APP_SECRET;
+  assert.equal((await post('/whatsapp/webhook')).status, 403);
   process.env.WHATSAPP_APP_SECRET = 'fixture';
   assert.equal((await post('/whatsapp/webhook')).status, 403);
   const signature = createHmac('sha256', 'fixture').update('{}').digest('hex');

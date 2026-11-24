@@ -20,9 +20,13 @@ function validateStartupEnv(options = { failFast: true }) {
     { name: 'WHATSAPP_ACCESS_TOKEN', value: config.WHATSAPP_ACCESS_TOKEN, required: whatsappEnabled },
     { name: 'WHATSAPP_PHONE_NUMBER_ID', value: config.WHATSAPP_PHONE_NUMBER_ID, required: whatsappEnabled },
     { name: 'WHATSAPP_BUSINESS_ACCOUNT_ID', value: config.WHATSAPP_BUSINESS_ACCOUNT_ID, required: whatsappEnabled },
-    { name: 'WHATSAPP_APP_SECRET', value: process.env.WHATSAPP_APP_SECRET, required: whatsappEnabled },
+
     { name: 'TELEGRAM_WEBHOOK_SECRET', value: config.TELEGRAM_WEBHOOK_SECRET, required: true },
   ];
+
+  if (whatsappEnabled && !process.env.WHATSAPP_APP_SECRET) {
+    console.warn('[WhatsApp] WHATSAPP_APP_SECRET missing. WhatsApp linking and delivery are paused.');
+  }
 
   const missingRequired = checks
     .filter(item => item.required && !String(item.value || '').trim())

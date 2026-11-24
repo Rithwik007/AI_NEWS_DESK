@@ -42,6 +42,9 @@ router.post('/register-number', requireClerkAuth, async (req, res) => {
       });
     }
 
+    if (!process.env.WHATSAPP_APP_SECRET) {
+      return res.status(503).json({ message: 'WhatsApp linking is temporarily unavailable. You can connect Telegram.' });
+    }
     if (!config.WHATSAPP_ACCESS_TOKEN || !isPhoneAllowed(formattedNumber)) {
       return res.status(403).json({ message: 'WhatsApp is available to invited numbers. You can link Telegram for delivery.' });
     }
@@ -84,7 +87,7 @@ router.get('/status', requireClerkAuth, async (req, res) => {
       success: true,
       registered: true,
       phoneNumber: user.whatsappPhoneNumber,
-      isWhatsAppEligible: isPhoneAllowed(user.whatsappPhoneNumber),
+      isWhatsAppEligible: Boolean(process.env.WHATSAPP_APP_SECRET) && isPhoneAllowed(user.whatsappPhoneNumber),
       registeredAt: user.whatsappRegisteredAt,
     });
   } catch (err) {
