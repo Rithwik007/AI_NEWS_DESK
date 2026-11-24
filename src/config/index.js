@@ -2,6 +2,11 @@ const { createHmac } = require('node:crypto');
 const dotenv = require('dotenv');
 dotenv.config();
 
+// Public deployment pair; forks keep their own configured origin or the local default.
+const hostedDashboard = process.env.RENDER_EXTERNAL_HOSTNAME === 'ai-news-backend-rmdj.onrender.com'
+  ? 'https://ai-news-desk-ecru.vercel.app'
+  : null;
+
 /**
  * Central configuration for the AI news pipeline.
  * All tunable constants and environment variables live here.
@@ -189,7 +194,8 @@ const config = {
   BACKEND_URL: process.env.BACKEND_URL || null,
 
   // Frontend dashboard public URL
-  FRONTEND_URL: process.env.FRONTEND_URL || 'http://localhost:5173',
+  HOSTED_DASHBOARD_ORIGIN: hostedDashboard,
+  FRONTEND_URL: process.env.FRONTEND_URL || hostedDashboard || 'http://localhost:5173',
 
   // --- WhatsApp Meta Cloud API ---
   WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN || null,

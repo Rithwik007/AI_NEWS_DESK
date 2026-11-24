@@ -17,7 +17,8 @@ function createApp() {
   const app = express();
 
   const allowedOrigins = [
-    config.FRONTEND_URL,
+    new URL(config.FRONTEND_URL).origin,
+    config.HOSTED_DASHBOARD_ORIGIN,
     'http://localhost:5173',
     'http://localhost:3000',
   ].filter(Boolean);

@@ -252,7 +252,7 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 - **What was built.** Isolated a missing Meta signing secret to WhatsApp and exposed the deployed Git revision in API health on Render.
 - **Why.** Render successfully built the release but exited during environment validation with two missing webhook credentials.
 - **How it works.** Telegram registration and request verification use a domain-separated HMAC of the bot token by default. An explicit webhook secret still takes precedence. Without a Meta app secret, WhatsApp rejects incoming messages, pauses registration and skips scheduled WhatsApp delivery.
-- **Verification performed.** See the deployment handoff for runtime checks.
+- **Verification performed.** All seven tests passed. Render served revision 16097fa with MongoDB connected, and Telegram accepted registration after the server accepted a signed empty update. A browser preflight then identified a missing dashboard origin. The known public frontend is now allowed on its paired Render hostname, while other hosts retain their own origin settings.
 - **Bugs found and fixed.** An optional integration could prevent the entire API from starting, and a working Telegram bot required a second manually synchronized credential.
 
 ## 5. Known Limitations & Backlog (Not Yet Resolved)
