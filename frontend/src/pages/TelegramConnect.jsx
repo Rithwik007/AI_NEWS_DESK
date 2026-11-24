@@ -65,6 +65,9 @@ export default function TelegramConnect() {
   const [waError, setWaError] = useState(null);
   const [waSuccess, setWaSuccess] = useState(null);
 
+  const [waChecking, setWaChecking] = useState(false);
+  const [waFeedback, setWaFeedback] = useState(null);
+
   // Telegram states
   const [copiedCode, setCopiedCode] = useState(false);
 
@@ -119,13 +122,25 @@ export default function TelegramConnect() {
   }, [getToken, setTelegramLinked]);
 
   // Check WhatsApp status
-  const checkWhatsAppStatus = React.useCallback(async () => {
+  const checkWhatsAppStatus = React.useCallback(async (request) => {
+    setWaChecking(true);
+    setWaError(null);
     try {
       const data = await apiFetch('/api/whatsapp/status', {}, getToken);
       if (data) {
         setWaStatus(data);
         setWhatsappEligible?.(Boolean(data.isWhatsAppEligible));
-        if (data.isWhatsAppEligible) setWaSuccess(null);
+        if (request) {
+          if (data.isWhatsAppEligible && data.phoneNumber === request.phoneNumber) {
+            setWaSuccess(null);
+            setWaFeedback('WhatsApp is connected.');
+          } else if (Date.now() >= Date.parse(request.expiresAt)) {
+            setWaSuccess(null);
+            setWaFeedback('Your code has expired. Register your number again for a fresh code.');
+          } else {
+            setWaFeedback('Still waiting for your message. Press Send in WhatsApp, then check again.');
+          }
+        }
         if (data.phoneNumber) {
           const parsed = parsePhoneNumber(data.phoneNumber);
           setCountryCode(parsed.countryCode);
@@ -133,7 +148,9 @@ export default function TelegramConnect() {
         }
       }
     } catch (err) {
-      console.error('[WhatsApp] Status check failed:', err);
+      setWaError(err.message || 'Could not check WhatsApp status. Try again.');
+    } finally {
+      setWaChecking(false);
     }
   }, [getToken, setWhatsappEligible]);
 
@@ -211,6 +228,7 @@ export default function TelegramConnect() {
   async function handleSaveWhatsApp(e) {
     e.preventDefault();
     setWaSaving(true);
+    setWaFeedback(null);
     setWaError(null);
     setWaSuccess(null);
 
@@ -233,7 +251,7 @@ export default function TelegramConnect() {
       );
 
       if (data && data.success) {
-        setWaSuccess(data.message);
+        setWaSuccess({ ...data, phoneNumber: fullPhoneNumber });
         trackEvent('whatsapp_link_requested');
       } else {
         throw new Error(data?.message || 'Failed to register WhatsApp number');
@@ -341,34 +359,24 @@ export default function TelegramConnect() {
           ℹ️ <strong>Invite list:</strong> WhatsApp delivery is currently available to a small invite list. Enter your number to check eligibility — if you&apos;re not on the list, you&apos;ll continue receiving your digest via Telegram, no action needed.
         </div>
 
-        {/* Post-submission feedback (Part A.2) */}
         {waSuccess && (
-          <div
-            style={{
-              padding: '0.75rem 1rem',
-              backgroundColor: waStatus.isWhatsAppEligible
-                ? 'rgba(47, 111, 98, 0.1)'
-                : '#FAF9F5',
-              border: waStatus.isWhatsAppEligible
-                ? '1px solid var(--color-signal)'
-                : '1px solid var(--color-hairline)',
-              borderRadius: '6px',
-              color: waStatus.isWhatsAppEligible
-                ? 'var(--color-signal)'
-                : 'var(--color-ink)',
-              fontSize: '0.9rem',
-              marginBottom: '1rem',
-              lineHeight: 1.4,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
-          >
-            <span>{waStatus.isWhatsAppEligible ? '✓' : 'ℹ️'}</span>
-            <span>{waSuccess}</span>
-            <button type="button" className="btn-secondary" onClick={checkWhatsAppStatus}>Check connection</button>
+          <div style={{ padding: '1rem', marginBottom: '1rem', border: '1px solid var(--color-hairline)', borderRadius: '6px' }}>
+            <p>{waSuccess.message}</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {waSuccess.businessNumber && waSuccess.command && (
+                <a className="btn-primary" target="_blank" rel="noopener noreferrer"
+                  href={`https://wa.me/${waSuccess.businessNumber.slice(1)}?text=${encodeURIComponent(waSuccess.command)}`}>
+                  Open WhatsApp
+                </a>
+              )}
+              <button type="button" className="btn-secondary" disabled={waChecking || waSaving}
+                onClick={() => checkWhatsAppStatus(waSuccess)}>
+                {waChecking ? 'Checking…' : 'Check link status'}
+              </button>
+            </div>
           </div>
         )}
+        {waFeedback && <p role="status">{waFeedback}</p>}
 
         {waError && (
           <div

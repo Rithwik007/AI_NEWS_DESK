@@ -6,6 +6,12 @@ process.env.CLERK_PUBLISHABLE_KEY = 'pk_test_' + Buffer.from('desk.clerk.account
 process.env.CLERK_SECRET_KEY = 'sk_test_fixture';
 process.env.WHATSAPP_APP_SECRET = 'fixture';
 
+// Load application dependencies before timing the local webhook round trip.
+require('../services/chat');
+require('@clerk/express');
+require('../models/User');
+require('../db/connect');
+
 test('an invited unlinked sender gets their own host’s dashboard link', { timeout: 10000 }, async t => {
   const config = require('../config');
   const phone = '15550100101';

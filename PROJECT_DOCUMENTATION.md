@@ -263,6 +263,10 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 - **Verification performed.** Production build and route checks are recorded in the release handoff.
 - **Bugs found and fixed.** Redirects no longer require returning visitors to open their desk manually. An unsuccessful profile load no longer presents an empty editable profile, and the country selector no longer duplicates an international prefix.
 
+### 2026-11-24 — WhatsApp phone confirmation
+
+Registration looks up the configured business display number through Meta and offers a prefilled WhatsApp message. The user sends it from their invited number. The status check now reports pending, expired and confirmed requests, and surfaces connection errors.
+
 ## 5. Known Limitations & Backlog (Not Yet Resolved)
 1. **PWA Service Worker Stale-Cache**:
    - Service worker caches the application shell. A frontend rebuild on Vercel may require a hard refresh on mobile if cached assets are held.

@@ -48,13 +48,31 @@ router.post('/register-number', requireClerkAuth, async (req, res) => {
     if (!config.WHATSAPP_ACCESS_TOKEN || !isPhoneAllowed(formattedNumber)) {
       return res.status(403).json({ message: 'WhatsApp is available to invited numbers. You can link Telegram for delivery.' });
     }
+    let businessNumber = null;
+    try {
+      const url = new URL(`https://graph.facebook.com/${config.WHATSAPP_API_VERSION || 'v20.0'}/${config.WHATSAPP_PHONE_NUMBER_ID}`);
+      url.searchParams.set('fields', 'display_phone_number');
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${config.WHATSAPP_ACCESS_TOKEN}` },
+        signal: AbortSignal.timeout(4000),
+      });
+      if (response.ok) businessNumber = normalizeToE164((await response.json()).display_phone_number);
+    } catch {
+      // A number lookup failure still allows linking through an existing business chat.
+    }
+    const expiresAt = new Date(Date.now() + 10 * 60_000);
     const code = randomBytes(8).toString('hex');
     await User.updateOne({ clerkUserId }, { $set: {
       whatsappPendingNumber: formattedNumber,
       whatsappLinkCode: code,
-      whatsappLinkExpiry: new Date(Date.now() + 10 * 60_000),
+      whatsappLinkExpiry: expiresAt,
     } }, { upsert: true });
-    return res.json({ success: true, message: `Send “link ${code}” from this number to the desk’s WhatsApp account within 10 minutes, then check your connection below.` });
+    const command = `link ${code}`;
+    const destination = businessNumber || 'the desk’s WhatsApp business account';
+    return res.json({
+      success: true, expiresAt, businessNumber, command,
+      message: `From ${formattedNumber}, send “${command}” to ${destination} within 10 minutes. Then check your link status here.`,
+    });
   } catch (err) {
     console.error(`[WhatsApp API] Error in /register-number: ${err.message}`);
     return res.status(500).json({
