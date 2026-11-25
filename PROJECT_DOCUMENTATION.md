@@ -279,6 +279,10 @@ Login and storage can be selected independently. A fresh local configuration use
 
 Readers can save a morning-only, evening-only or twice-daily delivery preference from Digest. Existing readers default to both editions. On-demand requests remain available.
 
+### 2026-11-25 — Suggested interests
+
+The interest editor offers 26 curated shortcuts alongside custom topics. Suggestions use the existing editable weights and save flow.
+
 ## 5. Known Limitations & Backlog (Not Yet Resolved)
 1. **PWA Service Worker Stale-Cache**:
    - Service worker caches the application shell. A frontend rebuild on Vercel may require a hard refresh on mobile if cached assets are held.

@@ -6,7 +6,7 @@ AI News Desk delivers a personalized AI news briefing to Telegram twice a day. C
 
 1. Open the dashboard and sign in.
 2. In **Delivery Channels**, generate a linking code, open the desk’s Telegram bot, and send the prefilled start command.
-3. In **Interests**, add your topics, adjust their weights, and save.
+3. In **Interests**, pick suggested topics or add your own, adjust their weights, and save.
 
 In **Digest**, choose morning only (**8:00 AM**), evening only (**6:00 PM**), or both editions. All times are India Standard Time. New accounts receive both editions by default. Once your chat is linked and your interests are saved, you can close the dashboard and turn off your laptop. Send `/digest` to the bot to request your latest briefing.
 

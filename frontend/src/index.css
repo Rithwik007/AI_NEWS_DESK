@@ -669,3 +669,12 @@ input[type="range"]::-moz-range-thumb {
 .digest-choice input { width: 1rem; height: 1rem; accent-color: var(--color-signal); }
 .digest-choice small { display: block; color: var(--color-slate); }
 .digest-preferences [role="status"] { margin-inline-start: .75rem; }
+
+.topic-picker { margin: 1.5rem 0; padding: 1rem; border: 1px solid var(--color-hairline); border-radius: 6px; }
+.topic-picker h2 { font-size: 1.25rem; margin: 0 0 .75rem; }
+.topic-chips { display: flex; flex-wrap: wrap; gap: .45rem; }
+.topic-suggestion { min-height: 40px; padding: .4rem .8rem; gap: .4rem; border: 1px solid var(--color-hairline); border-radius: 2rem; background: var(--color-paper); color: var(--color-ink); }
+.topic-suggestion:hover:enabled, .topic-suggestion:disabled { color: var(--color-signal); border-color: var(--color-signal); }
+.topic-suggestion:disabled { cursor: default; }
+.topic-picker summary { width: fit-content; padding: .7rem 0 .25rem; color: var(--color-signal); cursor: pointer; }
+.topic-group h3 { font: 600 .95rem var(--font-body); margin: 1rem 0 .4rem; }

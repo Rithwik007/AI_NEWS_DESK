@@ -4,6 +4,15 @@ import { apiFetch } from '../utils/api';
 import { trackEvent } from '../utils/analytics';
 import Spinner from '../components/Spinner';
 
+const starterTopics = ['AI agents', 'Robotics', 'Open-source AI', 'AI in healthcare', 'AI startups', 'AI safety'];
+const moreTopics = {
+  'Models and research': ['Language models', 'AI reasoning', 'Multimodal AI', 'Model evaluation'],
+  'Tools and engineering': ['Coding assistants', 'AI chips', 'On-device AI', 'Retrieval-augmented generation'],
+  'Creative work': ['Image generation', 'AI video', 'Speech and audio AI', 'AI in gaming'],
+  'Science and industry': ['AI in education', 'AI in finance', 'Climate and energy AI', 'AI for scientific discovery'],
+  'Business and society': ['AI regulation', 'Privacy and AI', 'AI and the future of work', 'AI security'],
+};
+
 export default function InterestEditor() {
   const { getToken } = useAuth();
 
@@ -52,8 +61,15 @@ export default function InterestEditor() {
     setTopics(updated);
   }
 
-  function handleAddTopic() {
-    setTopics([...topics, { topic: '', weight: 0.8 }]);
+  function addTopic(label = '') {
+    setSavedNotice(false);
+    setTopics(current => {
+      if (label) {
+        const blank = current.findIndex(item => !item.topic.trim());
+        if (blank >= 0) return current.map((item, i) => i === blank ? { ...item, topic: label } : item);
+      }
+      return [...current, { topic: label, weight: 0.8 }];
+    });
     if (validationError) setValidationError(null);
   }
 
@@ -111,6 +127,18 @@ export default function InterestEditor() {
     } finally {
       setSaving(false);
     }
+  }
+
+  const chosen = new Set(topics.map(item => item.topic.trim().toLowerCase()));
+  function suggestion(label) {
+    const added = chosen.has(label.toLowerCase());
+    return (
+      <button key={label} type="button" className="topic-suggestion" disabled={saving || added}
+        aria-label={added ? label + ' already added' : 'Add ' + label}
+        onClick={() => addTopic(label)}>
+        <span aria-hidden="true">{added ? '✓' : '+'}</span> {label}
+      </button>
+    );
   }
 
   // Check validity for disabling save button
@@ -174,23 +202,20 @@ export default function InterestEditor() {
             </div>
           )}
 
-          {topics.length === 0 ? (
-            <div
-              style={{
-                margin: '2.5rem 0',
-                padding: '1.5rem',
-                border: '1px dashed var(--color-hairline)',
-                borderRadius: '4px',
-              }}
-            >
-              <p style={{ marginBottom: '1rem', color: 'var(--color-slate)' }}>
-                No topics yet — add at least one topic below to start getting a personalized digest.
-              </p>
-              <button onClick={handleAddTopic} className="btn-secondary" id="btn-add-first-topic">
-                Add topic
-              </button>
-            </div>
-          ) : (
+          <section className="topic-picker" aria-labelledby="suggested-topics">
+            <h2 id="suggested-topics">Suggested topics</h2>
+            <div className="topic-chips">{starterTopics.map(suggestion)}</div>
+            <details>
+              <summary>Browse more topics</summary>
+              {Object.entries(moreTopics).map(([group, labels]) => (
+                <div className="topic-group" key={group}>
+                  <h3>{group}</h3>
+                  <div className="topic-chips">{labels.map(suggestion)}</div>
+                </div>
+              ))}
+            </details>
+          </section>
+          {topics.length > 0 && (
             <div className="topic-list" id="topic-list-container">
               {topics.map((t, idx) => {
                 const isRowEmpty = !t.topic || !t.topic.trim();
@@ -199,6 +224,7 @@ export default function InterestEditor() {
                     <div className="topic-header-row">
                       <div style={{ flex: 1 }}>
                         <input
+                          disabled={saving}
                           type="text"
                           value={t.topic}
                           placeholder="e.g. LLM reasoning, coding agents, multimodal models..."
@@ -213,6 +239,7 @@ export default function InterestEditor() {
                       </div>
                       <button
                         type="button"
+                        disabled={saving}
                         onClick={() => handleRemoveTopic(idx)}
                         className="btn-destructive"
                         title="Remove topic"
@@ -226,6 +253,7 @@ export default function InterestEditor() {
                     <div className="topic-slider-row">
                       <span className="slider-label">Weight multiplier:</span>
                       <input
+                        disabled={saving}
                         type="range"
                         min="0.0"
                         max="1.0"
@@ -255,11 +283,12 @@ export default function InterestEditor() {
             }}
           >
             <button
-              onClick={handleAddTopic}
+              onClick={() => addTopic()}
+              disabled={saving}
               className="btn-secondary btn-full-mobile"
               id="btn-add-topic"
             >
-              Add topic
+              Add custom topic
             </button>
 
             <button
