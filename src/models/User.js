@@ -17,6 +17,11 @@ const userSchema = new mongoose.Schema({
     unique: true,
     index: true,
   },
+  digestSchedule: {
+    type: String,
+    enum: ['both', 'morning', 'evening'],
+    default: 'both',
+  },
   telegramChatId: {
     type: String,
     default: null,

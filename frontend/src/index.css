@@ -660,3 +660,12 @@ input[type="range"]::-moz-range-thumb {
 
 .desk-edition { margin-bottom: 1.7rem; }
 .auth-page { background: radial-gradient(ellipse at 10% 5%, #d7e4d7, transparent 55%), var(--color-paper); border-top: 5px solid #1a453b; }
+
+.digest-preferences { margin: 0 0 2rem; }
+.digest-preferences fieldset { margin: 0 0 1rem; padding: 0; border: 0; }
+.digest-preferences legend { font-size: 1.35rem; font-weight: 650; }
+.digest-choice { display: flex; align-items: center; gap: .8rem; padding: .8rem 1rem; margin-top: .5rem; border: 1px solid var(--color-hairline); border-radius: 6px; cursor: pointer; }
+.digest-choice:has(:checked) { border-color: var(--color-signal); background: var(--color-paper); }
+.digest-choice input { width: 1rem; height: 1rem; accent-color: var(--color-signal); }
+.digest-choice small { display: block; color: var(--color-slate); }
+.digest-preferences [role="status"] { margin-inline-start: .75rem; }

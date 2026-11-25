@@ -490,7 +490,7 @@ export default function TelegramConnect() {
 
             {waStatus.isWhatsAppEligible ? (
               <p className="text-slate" style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
-                You will receive morning (8:00 AM) &amp; evening (6:00 PM) WhatsApp digest templates. Reply <strong>digest</strong> anytime for full articles.
+                Your delivery schedule applies to these alerts. Reply <strong>digest</strong> anytime for full articles.
               </p>
             ) : (
               <p className="text-slate" style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>
@@ -547,7 +547,7 @@ export default function TelegramConnect() {
         {status.linked && !showFlow ? (
           <div>
             <p style={{ marginBottom: '1.25rem', fontSize: '0.95rem' }}>
-              Connected chat ID: <strong>{status.telegramChatId}</strong>. Digests deliver automatically at 8:00 AM &amp; 6:00 PM IST.
+              Connected chat ID: <strong>{status.telegramChatId}</strong>. Manage your delivery times under <a href="/digest">Digest</a>.
             </p>
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
               <button

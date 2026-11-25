@@ -78,6 +78,23 @@ test('desk storage, reader identity and Telegram linking', async t => {
     assert.equal((await User.findOne({ clerkUserId: 'poll-reader' })).telegramChatId, '456');
   }
 
+  const schedules = ['morning', 'evening', 'both'];
+  for (const digestSchedule of schedules) {
+    await User.create({ clerkUserId: digestSchedule, telegramChatId: digestSchedule, digestSchedule });
+    await Rel.create({ userId: digestSchedule, articleId: article._id, isRelevant: true, confidenceTier: 'high' });
+  }
+  await User.updateOne({ clerkUserId: 'reader-a' }, { $unset: { digestSchedule: '' } });
+  await Article.updateOne({ _id: article._id }, { $set: { summary: 'Story summary', whyReadThis: 'Context', fetchedAt: new Date(Date.now() - 3600000) } });
+  const { deliverToTelegram } = require('../services/telegram');
+  for (const runType of ['morning', 'evening']) {
+    const result = await deliverToTelegram({ runType, dryRun: true });
+    const ids = result.userResults.map(row => row.userId);
+    assert.ok(ids.includes('both') && ids.includes('reader-a'));
+    assert.equal(ids.includes('morning'), runType === 'morning');
+    assert.equal(ids.includes('evening'), runType === 'evening');
+    assert.equal(result.userResults.find(r => r.userId === runType).deliveredCount, 1);
+  }
+
   const server = require('../api/app').createApp().listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   t.after(() => new Promise(resolve => server.close(resolve)));
@@ -88,6 +105,15 @@ test('desk storage, reader identity and Telegram linking', async t => {
     assert.equal((await sync()).status, 201);
     assert.equal((await sync()).status, 200);
     assert.equal((await (await fetch(base + '/api/auth/me', { headers })).json()).user.clerkUserId, 'local-reader');
+    const schedule = digestSchedule => fetch(base + '/api/auth/schedule', {
+      method: 'PUT', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ digestSchedule }),
+    });
+    assert.equal((await schedule('weekly')).status, 400);
+    for (const value of schedules) {
+      assert.equal((await schedule(value)).status, 200);
+      const profile = await (await fetch(base + '/api/auth/me', { headers })).json();
+      assert.equal(profile.user.digestSchedule, value);
+    }
     assert.equal((await fetch(base + '/api/auth/me')).status, 403);
     assert.equal((await fetch(base + '/api/auth/me', { headers: { ...headers, origin: 'https://example.org' } })).status, 403);
   } else {

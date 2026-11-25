@@ -237,6 +237,8 @@ async function deliverTopStoriesMultiUser(options = {}) {
           { telegramChatId: { $ne: null } },
         ],
       };
+  // Older accounts have no stored preference and receive both editions.
+  userQuery.digestSchedule = { $in: [null, 'both', runType] };
   const users = await User.find(userQuery).lean();
   console.log(`[Delivery] Found ${users.length} user(s) with linked delivery channels (Telegram/WhatsApp).`);
 
@@ -277,7 +279,7 @@ async function deliverTopStoriesMultiUser(options = {}) {
     const eligibleRels = userRels.filter((r) => {
       const art = r.articleId;
       if (!art || !art.summary || !art.whyReadThis) return false;
-      if (runType === 'evening' && morningCutoff) {
+      if (runType === 'evening' && morningCutoff && user.digestSchedule !== 'evening') {
         return art.fetchedAt && art.fetchedAt > morningCutoff;
       }
       return true;

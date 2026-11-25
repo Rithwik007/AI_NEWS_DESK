@@ -28,6 +28,7 @@ router.post('/sync', requireClerkAuth, async (req, res) => {
         telegramChatId: user.telegramChatId,
         telegramLinkedAt: user.telegramLinkedAt,
         createdAt: user.createdAt,
+        digestSchedule: user.digestSchedule || 'both',
       },
     });
   } catch (err) {
@@ -62,6 +63,7 @@ router.get('/me', requireClerkAuth, async (req, res) => {
         telegramChatId: user.telegramChatId,
         telegramLinkedAt: user.telegramLinkedAt,
         createdAt: user.createdAt,
+        digestSchedule: user.digestSchedule || 'both',
       },
     });
   } catch (err) {
@@ -71,6 +73,18 @@ router.get('/me', requireClerkAuth, async (req, res) => {
       message: 'Failed to fetch user profile',
     });
   }
+});
+
+router.put('/schedule', requireClerkAuth, async (req, res) => {
+  const schedule = req.body?.digestSchedule;
+  if (!User.schema.path('digestSchedule').enumValues.includes(schedule)) {
+    return res.status(400).json({ message: 'Choose morning, evening, or both editions.' });
+  }
+  const user = await User.findOneAndUpdate(
+    { clerkUserId: req.auth.userId }, { $set: { digestSchedule: schedule } },
+    { upsert: true, new: true, runValidators: true }
+  );
+  res.json({ digestSchedule: user.digestSchedule });
 });
 
 module.exports = router;

@@ -8,13 +8,13 @@ AI News Desk delivers a personalized AI news briefing to Telegram twice a day. C
 2. In **Delivery Channels**, generate a linking code, open the desk’s Telegram bot, and send the prefilled start command.
 3. In **Interests**, add your topics, adjust their weights, and save.
 
-The hosted service schedules editions for **8:00 AM and 6:00 PM India Standard Time**. Once your chat is linked and your interests are saved, you can close the dashboard and turn off your laptop. Send `/digest` to the bot to request your latest briefing.
+In **Digest**, choose morning only (**8:00 AM**), evening only (**6:00 PM**), or both editions. All times are India Standard Time. New accounts receive both editions by default. Once your chat is linked and your interests are saved, you can close the dashboard and turn off your laptop. Send `/digest` to the bot to request your latest briefing.
 
 ## How the desk picks stories
 
 The backend collects articles from RSS feeds, Google News searches, and Hacker News. It uses text embeddings to group coverage of the same story and rank articles against each reader’s interests. Groq summarizes selected stories, and the Telegram bot delivers the briefing with links to the sources.
 
-The morning edition considers the previous 24 hours of coverage. The evening edition focuses on stories collected since the morning run.
+The morning edition considers the previous 24 hours of coverage. For twice-daily readers the evening edition focuses on stories collected since the morning run. Evening-only readers also get eligible coverage from earlier in the day.
 
 ## Hosted architecture
 

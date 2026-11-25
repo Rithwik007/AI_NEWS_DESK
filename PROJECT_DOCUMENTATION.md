@@ -275,6 +275,10 @@ WhatsApp accepts both digest command spellings and sends numbered stories using 
 
 Login and storage can be selected independently. A fresh local configuration uses one loopback-only reader and a SQLite file. Telegram remains required and uses polling in personal mode. Existing hosted configurations default to Clerk and MongoDB.
 
+### 2026-11-25 — Reader delivery schedules
+
+Readers can save a morning-only, evening-only or twice-daily delivery preference from Digest. Existing readers default to both editions. On-demand requests remain available.
+
 ## 5. Known Limitations & Backlog (Not Yet Resolved)
 1. **PWA Service Worker Stale-Cache**:
    - Service worker caches the application shell. A frontend rebuild on Vercel may require a hard refresh on mobile if cached assets are held.

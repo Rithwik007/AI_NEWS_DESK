@@ -428,7 +428,7 @@ async function resendLatestDigest(user, targetId, options = {}) {
     }
 
     // Option 1 fallback: If < 5 relevant articles found, send clear waiting message
-    const emptyMsg = `📭 *You're all set!*\n\nYou haven't received a digest yet because personalized digests are generated during scheduled delivery runs (*8:00 AM* & *6:00 PM IST*).\n\nYour first tailored digest will arrive at the next scheduled run. In the meantime, you can customize your tracked topics and relevance weights on your dashboard:\n${config.FRONTEND_URL}`;
+    const emptyMsg = `📭 *You're all set!*\n\nYou haven't received a digest yet because personalized digests are generated during scheduled delivery runs (*8:00 AM* & *6:00 PM IST*).\n\nYour first tailored digest can arrive at your next selected edition. In the meantime, you can customize your tracked topics and relevance weights on your dashboard:\n${config.FRONTEND_URL}`;
     if (isWhatsApp) {
       await whatsappService.sendWhatsAppMessage(targetId, emptyMsg);
     } else {
