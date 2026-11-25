@@ -43,20 +43,12 @@ function formatWhatsAppArticleEntry(article, index) {
   const summary = (article.summary || '').trim();
   const whyReadThis = article.publicRationale ? (article.whyReadThis || '').trim() : '';
 
-  const sourceTag = source ? ` _(${source})_` : '';
-  let entry = `*${index}. ${title}*${sourceTag}\n`;
-  if (url) {
-    entry += `🔗 ${url}\n`;
-  }
-  entry += `\n`;
-
-  if (summary) {
-    entry += `${summary}\n\n`;
-  }
-  if (whyReadThis) {
-    entry += `💡 *Why read this:* ${whyReadThis}\n\n`;
-  }
-  return entry;
+  const lines = [`*${index}. ${title}*`];
+  if (summary) lines.push(summary);
+  if (whyReadThis) lines.push(`*Why it matters* — ${whyReadThis}`);
+  if (source) lines.push(`_${source}_`);
+  if (url) lines.push(url);
+  return lines.join('\n') + '\n\n';
 }
 
 /**

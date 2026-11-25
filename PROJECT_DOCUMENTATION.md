@@ -267,6 +267,10 @@ The system features a self-serve Progressive Web App (PWA) dashboard with Clerk 
 
 Registration looks up the configured business display number through Meta and offers a prefilled WhatsApp message. The user sends it from their invited number. The status check now reports pending, expired and confirmed requests, and surfaces connection errors.
 
+### 2026-11-25 — WhatsApp digest and self-host setup
+
+WhatsApp accepts both digest command spellings and sends numbered stories using the saved edition. The README includes agent-assisted setup and a per-file credential guide.
+
 ## 5. Known Limitations & Backlog (Not Yet Resolved)
 1. **PWA Service Worker Stale-Cache**:
    - Service worker caches the application shell. A frontend rebuild on Vercel may require a hard refresh on mobile if cached assets are held.

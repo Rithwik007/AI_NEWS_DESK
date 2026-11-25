@@ -12,6 +12,12 @@ require('@clerk/express');
 require('../models/User');
 require('../db/connect');
 
+test('WhatsApp stories put the headline and summary before the source link', () => {
+  const { formatWhatsAppArticleEntry } = require('../services/whatsapp');
+  const article = { title: 'A new model', summary: 'A short finding.', source: 'Example', url: 'https://example.org/story', whyReadThis: 'Private ranking reason' };
+  assert.equal(formatWhatsAppArticleEntry(article, 1), '*1. A new model*\nA short finding.\n_Example_\nhttps://example.org/story\n\n');
+});
+
 test('an invited unlinked sender gets their own host’s dashboard link', { timeout: 10000 }, async t => {
   const config = require('../config');
   const phone = '15550100101';

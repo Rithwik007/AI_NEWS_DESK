@@ -219,7 +219,7 @@ router.post('/webhook', async (req, res) => {
     }
 
     // Handle "digest" command
-    if (text.toLowerCase() === 'digest') {
+    if (/^\/?digest$/i.test(text)) {
       console.log(`[WhatsApp Webhook] User "${user.clerkUserId}" requested digest via WhatsApp.`);
       await resendLatestDigest(user, from, { channel: 'whatsapp' });
       return;

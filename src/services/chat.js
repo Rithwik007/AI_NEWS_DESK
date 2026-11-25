@@ -149,7 +149,7 @@ ${digestContext}
 INSTRUCTIONS:
 1. If the user asks about news, recent events, or topics from their digest, use the factual details from the articles above (title, outlet, summary, why it matters) to give an insightful, friendly, and accurate take.
 2. If the user asks about anything else (general questions, coding, chit-chat, everyday life), chat naturally and casually as a friend. Do NOT force connections to AI news or the digest if they're asking about an unrelated topic.
-3. Keep answers warm, concise, conversational, and direct for mobile chat (WhatsApp/Telegram). Avoid robotic preamble, corporate disclaimers, or overly formal sign-offs.`;
+3. Keep answers warm, concise, conversational, and direct for mobile chat (WhatsApp/Telegram). Use short paragraphs or bullets. Avoid Markdown tables, which are hard to read in chat.`;
 
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -314,13 +314,9 @@ async function generateAndDeliverWelcomeDigest(user, targetId, channel) {
     matchedTopic,
   }));
 
-  const welcomeGreeting = await generateDigestGreeting();
+  const welcomeGreeting = channel !== 'whatsapp' ? await generateDigestGreeting() : null;
   if (welcomeGreeting) {
-    if (channel === 'whatsapp') {
-      await whatsappService.sendWhatsAppMessage(targetId, welcomeGreeting);
-    } else {
-      await telegramService.sendTelegramMessage(welcomeGreeting, targetId);
-    }
+    await telegramService.sendTelegramMessage(welcomeGreeting, targetId);
     await new Promise((r) => setTimeout(r, 600));
   }
 
@@ -476,13 +472,9 @@ async function resendLatestDigest(user, targetId, options = {}) {
   }));
 
   // Generate a dynamic, unique 1-sentence friendly greeting via Groq
-  const greeting = await generateDigestGreeting();
+  const greeting = !isWhatsApp ? await generateDigestGreeting() : null;
   if (greeting) {
-    if (isWhatsApp) {
-      await whatsappService.sendWhatsAppMessage(targetId, greeting);
-    } else {
-      await telegramService.sendTelegramMessage(greeting, targetId);
-    }
+    await telegramService.sendTelegramMessage(greeting, targetId);
     await new Promise((r) => setTimeout(r, 600));
   }
 
