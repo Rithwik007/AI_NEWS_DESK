@@ -34,6 +34,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
+      'import.meta.env.VITE_AUTH_MODE': JSON.stringify(env.AUTH_MODE || env.VITE_AUTH_MODE || 'clerk'),
       'import.meta.env.VITE_DESK_PROXY': JSON.stringify(
         env.VERCEL === '1' && env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '') === 'https://ai-news-backend-rmdj.onrender.com'
       ),
@@ -46,7 +47,7 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: {
         '/api': {
-          target: 'http://localhost:3000',
+          target: 'http://127.0.0.1:3000',
           changeOrigin: true,
         },
       },

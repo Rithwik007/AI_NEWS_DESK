@@ -76,6 +76,6 @@ const articleSchema = new mongoose.Schema({
 articleSchema.index({ clusterId: 1 });
 articleSchema.index({ isPrimary: 1 });
 
-const Article = mongoose.model('Article', articleSchema);
+const Article = require('../db/model')('Article', articleSchema);
 
 module.exports = Article;

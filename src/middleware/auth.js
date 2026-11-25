@@ -10,6 +10,18 @@ const { getAuth } = require('@clerk/express');
  * @param {import('express').NextFunction} next
  */
 function requireClerkAuth(req, res, next) {
+  if (require('../config').AUTH_MODE === 'none') {
+    const localHost = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::[0-9]+)?$/i;
+    const origin = req.get('origin');
+    const localOrigin = !origin || /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::[0-9]+)?$/i.test(origin);
+    if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress)
+        || !localHost.test(req.get('host')) || !localOrigin || req.get('forwarded') || req.get('x-forwarded-for')
+        || req.get('x-desk-local') !== '1') {
+      return res.status(403).json({ message: 'Open your personal desk on localhost.' });
+    }
+    req.auth = { userId: 'local-reader' };
+    return next();
+  }
   const auth = getAuth(req);
 
   if (!auth || !auth.userId) {

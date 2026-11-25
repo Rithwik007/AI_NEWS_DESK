@@ -64,6 +64,6 @@ userSchema.index({ whatsappPhoneNumber: 1 }, {
   unique: true, name: 'verified_whatsapp_number', partialFilterExpression: { whatsappVerifiedAt: { $type: 'date' } },
 });
 
-const User = mongoose.model('User', userSchema);
+const User = require('../db/model')('User', userSchema);
 
 module.exports = User;

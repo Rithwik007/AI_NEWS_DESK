@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '../utils/deskAuth';
 import { apiFetch } from '../utils/api';
 import { trackEvent } from '../utils/analytics';
 import Spinner from '../components/Spinner';

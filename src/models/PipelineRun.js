@@ -60,6 +60,6 @@ const pipelineRunSchema = new mongoose.Schema({
 // Indexes for fast lookup of last successful run by type
 pipelineRunSchema.index({ runType: 1, status: 1, completedAt: -1 });
 
-const PipelineRun = mongoose.model('PipelineRun', pipelineRunSchema);
+const PipelineRun = require('../db/model')('PipelineRun', pipelineRunSchema);
 
 module.exports = PipelineRun;

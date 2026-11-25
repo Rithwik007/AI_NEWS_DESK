@@ -12,6 +12,8 @@ const hostedDashboard = process.env.RENDER_EXTERNAL_HOSTNAME === 'ai-news-backen
  * All tunable constants and environment variables live here.
  */
 const config = {
+  AUTH_MODE: process.env.AUTH_MODE || 'clerk',
+  DATABASE_MODE: process.env.DATABASE_MODE || 'mongodb',
   // MongoDB connection string — loaded from .env, never hardcoded
   MONGODB_URI: process.env.MONGODB_URI,
 
@@ -216,7 +218,9 @@ if (!process.env.CLERK_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_CLERK_PUBLISHA
 }
 
 // Validate required config
-if (!config.MONGODB_URI) {
+if (!['none', 'clerk'].includes(config.AUTH_MODE)) throw new Error('Choose AUTH_MODE=none or clerk');
+if (!['sqlite', 'mongodb'].includes(config.DATABASE_MODE)) throw new Error('Choose DATABASE_MODE=sqlite or mongodb');
+if (config.DATABASE_MODE === 'mongodb' && !config.MONGODB_URI) {
   throw new Error('MONGODB_URI is required in .env — see .env.example');
 }
 

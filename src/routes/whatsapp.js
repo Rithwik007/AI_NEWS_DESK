@@ -91,9 +91,10 @@ router.get('/status', requireClerkAuth, async (req, res) => {
     const clerkUserId = req.auth.userId;
     const user = await User.findOne({ clerkUserId }).lean();
 
+    const available = Boolean(process.env.WHATSAPP_APP_SECRET && config.WHATSAPP_ACCESS_TOKEN);
     if (!user?.whatsappVerifiedAt || !user.whatsappPhoneNumber) {
       return res.status(200).json({
-        success: true,
+        success: true, available,
         registered: false,
         phoneNumber: null,
         isWhatsAppEligible: false,
@@ -102,7 +103,7 @@ router.get('/status', requireClerkAuth, async (req, res) => {
     }
 
     return res.status(200).json({
-      success: true,
+      success: true, available,
       registered: true,
       phoneNumber: user.whatsappPhoneNumber,
       isWhatsAppEligible: Boolean(process.env.WHATSAPP_APP_SECRET) && isPhoneAllowed(user.whatsappPhoneNumber),

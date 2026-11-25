@@ -17,7 +17,8 @@ function DeskEntry() {
 }
 
 export default function AccountRoutes() {
-  if (!clerkPubKey) return (
+  const personal = import.meta.env.VITE_AUTH_MODE === 'none';
+  if (!personal && !clerkPubKey) return (
     <main className="setup-note">
       <h1>Connect your Clerk application</h1>
       <p>Set VITE_CLERK_PUBLISHABLE_KEY in frontend/.env and restart Vite to enable account access.</p>
@@ -26,8 +27,8 @@ export default function AccountRoutes() {
   );
   return (
     <Routes>
-      <Route path="/login/*" element={<Login />} />
-      <Route path="/sign-up/*" element={<SignUpPage />} />
+      <Route path="/login/*" element={personal ? <Navigate to="/desk" replace /> : <Login />} />
+      <Route path="/sign-up/*" element={personal ? <Navigate to="/desk" replace /> : <SignUpPage />} />
 
       <Route path="/" element={<AppLayout />}>
         <Route path="desk" element={<DeskEntry />} />

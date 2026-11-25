@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth, useUser, useClerk } from '@clerk/clerk-react';
+import { useAuth, useUser, useClerk } from '../utils/deskAuth';
 import { apiFetch } from '../utils/api';
 import { identifyUser, trackPageView, resetAnalytics } from '../utils/analytics';
 import Spinner from './Spinner';
@@ -11,11 +11,10 @@ export default function AppLayout() {
   const { signOut } = useClerk();
   const navigate = useNavigate();
   const location = useLocation();
-  const [whatsappEligible, setWhatsappEligible] = useState(false);
   const [telegramLinked, setTelegramLinked] = useState(false);
   const [syncing, setSyncing] = useState(true);
 
-  const deliveryConnected = whatsappEligible || telegramLinked;
+  const deliveryConnected = telegramLinked;
   const isAuthenticated = isSignedIn;
 
   // Track pageviews on location changes
@@ -42,17 +41,8 @@ export default function AppLayout() {
           // Call /api/auth/sync
           await apiFetch('/api/auth/sync', { method: 'POST' }, getToken);
 
-          // Check Telegram and WhatsApp status
-          const [tgStatus, waStatus] = await Promise.all([
-            apiFetch('/api/telegram/status', {}, getToken).catch(() => null),
-            apiFetch('/api/whatsapp/status', {}, getToken).catch(() => null),
-          ]);
-
-          const isTg = Boolean(tgStatus?.linked);
-          const isWa = Boolean(waStatus?.isWhatsAppEligible);
-
-          setTelegramLinked(isTg);
-          setWhatsappEligible(isWa);
+          const status = await apiFetch('/api/telegram/status', {}, getToken);
+          setTelegramLinked(Boolean(status?.linked));
         } catch (err) {
           console.error('[AppLayout] Sync error:', err);
         } finally {
@@ -139,7 +129,7 @@ export default function AppLayout() {
           <div className="user-snippet">
             {user?.primaryEmailAddress?.emailAddress || user?.fullName || 'Editor'}
           </div>
-          <button
+          {import.meta.env.VITE_AUTH_MODE !== 'none' && <button
             onClick={() => {
               resetAnalytics();
               signOut(() => navigate('/login'));
@@ -149,13 +139,13 @@ export default function AppLayout() {
             id="btn-sign-out"
           >
             Sign out
-          </button>
+          </button>}
         </div>
       </aside>
 
       {/* Main Content Area */}
       <main className="content-area">
-        <Outlet context={{ deliveryConnected, telegramLinked, setTelegramLinked, setWhatsappEligible }} />
+        <Outlet context={{ deliveryConnected, telegramLinked, setTelegramLinked }} />
       </main>
 
       {/* Mobile Bottom Tab Bar (Thumb-reachable) */}

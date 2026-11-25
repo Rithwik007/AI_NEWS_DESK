@@ -72,6 +72,6 @@ articleRelevanceSchema.index({ articleId: 1, userId: 1 }, { unique: true });
 // Performance index for top-5 delivery queries
 articleRelevanceSchema.index({ userId: 1, deliveryStatus: 1, rankingScore: -1 });
 
-const ArticleRelevance = mongoose.model('ArticleRelevance', articleRelevanceSchema);
+const ArticleRelevance = require('../db/model')('ArticleRelevance', articleRelevanceSchema);
 
 module.exports = ArticleRelevance;

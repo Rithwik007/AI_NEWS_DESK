@@ -34,7 +34,7 @@ function createApp() {
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'x-pipeline-secret'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'x-pipeline-secret', 'X-Desk-Local'],
     })
   );
 
@@ -45,7 +45,7 @@ function createApp() {
   }));
 
   // Attach Clerk auth context to all requests (verifies session tokens if provided)
-  app.use(clerkMiddleware());
+  if (config.AUTH_MODE === 'clerk') app.use(clerkMiddleware());
 
   // Ensure DB connection is active before processing API route operations
   const { ensureDBConnected } = require('../db/connect');
@@ -74,7 +74,7 @@ function createApp() {
 
   // Health check endpoint with DB state monitoring
   app.get('/api/health', (req, res) => {
-    const dbState = mongoose.connection.readyState;
+    const dbState = config.DATABASE_MODE === 'sqlite' ? Number(require('../db/sqlite').isOpen()) : mongoose.connection.readyState;
     const dbStatusMap = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
     res.json({
       status: dbState === 1 ? 'ok' : 'degraded',

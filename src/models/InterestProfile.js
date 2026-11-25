@@ -38,6 +38,6 @@ const interestProfileSchema = new mongoose.Schema({
   },
 });
 
-const InterestProfile = mongoose.model('InterestProfile', interestProfileSchema);
+const InterestProfile = require('../db/model')('InterestProfile', interestProfileSchema);
 
 module.exports = InterestProfile;

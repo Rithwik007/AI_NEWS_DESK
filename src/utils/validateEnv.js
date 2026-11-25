@@ -11,11 +11,11 @@ const config = require('../config');
 function validateStartupEnv(options = { failFast: true }) {
   const whatsappEnabled = Boolean(config.WHATSAPP_ACCESS_TOKEN || config.WHATSAPP_PHONE_NUMBER_ID || config.WHATSAPP_BUSINESS_ACCOUNT_ID || config.WEBHOOK_VERIFY_TOKEN || process.env.WHATSAPP_APP_SECRET);
   const checks = [
-    { name: 'MONGODB_URI', value: config.MONGODB_URI, required: true },
+    { name: 'MONGODB_URI', value: config.MONGODB_URI, required: config.DATABASE_MODE === 'mongodb' },
     { name: 'GROQ_API_KEY', value: config.GROQ_API_KEYS?.[0] || config.GROQ_API_KEY, required: true },
     { name: 'TELEGRAM_BOT_TOKEN', value: config.TELEGRAM_BOT_TOKEN, required: true },
-    { name: 'CLERK_SECRET_KEY', value: config.CLERK_SECRET_KEY, required: true },
-    { name: 'CLERK_PUBLISHABLE_KEY', value: config.CLERK_PUBLISHABLE_KEY, required: true },
+    { name: 'CLERK_SECRET_KEY', value: config.CLERK_SECRET_KEY, required: config.AUTH_MODE === 'clerk' },
+    { name: 'CLERK_PUBLISHABLE_KEY', value: config.CLERK_PUBLISHABLE_KEY, required: config.AUTH_MODE === 'clerk' },
     { name: 'WEBHOOK_VERIFY_TOKEN', value: config.WEBHOOK_VERIFY_TOKEN, required: whatsappEnabled },
     { name: 'WHATSAPP_ACCESS_TOKEN', value: config.WHATSAPP_ACCESS_TOKEN, required: whatsappEnabled },
     { name: 'WHATSAPP_PHONE_NUMBER_ID', value: config.WHATSAPP_PHONE_NUMBER_ID, required: whatsappEnabled },

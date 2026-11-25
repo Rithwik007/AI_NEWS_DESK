@@ -6,7 +6,7 @@ AI News Desk reads AI news feeds, groups coverage of the same story, ranks stori
 
 Clone or download this repository, open its folder in your coding agent, and paste this prompt:
 
-> Set up AI News Desk on this computer using this README. Check Node and npm, install dependencies with npm ci at the root and in frontend, and copy both .env.example files to their matching .env files only if missing. Keep scheduling disabled during setup. Build the frontend and run the offline tests. Then pause and tell me which fields to fill in locally for MongoDB, Clerk, Groq and Telegram. Leave other optional integrations blank. After I fill in the files, start the API and dashboard, check database health and help me link my own bot. Use my own services and keep secrets out of chat, logs and Git.
+> Set up AI News Desk on my computer. Ask me to choose login (no login or Clerk) and storage (local SQLite file or MongoDB). Default to no login and SQLite. Telegram is required in every mode. Apply my choices in the root .env using the settings below. Preserve existing keys, install both sets of dependencies, and run the tests and frontend build. Tell me exactly which keys to enter locally. Once I have supplied them, start the desk, verify database health and help me link my own Telegram bot. Keep secrets out of chat and Git.
 
 For a preview without credentials, use **Try the frontend** below. For a working personal desk, follow **Run your own desk**.
 
@@ -41,39 +41,52 @@ npm test
 npm run build --prefix frontend
 ```
 
-To create the env files on Windows PowerShell, use the following commands. On macOS or Linux, use `cp -n .env.example .env` and `cp -n frontend/.env.example frontend/.env`.
+Run `npm run setup` from the root. It asks two questions: **Login** (none or Clerk) and **Database** (SQLite or MongoDB). Press Enter twice on a fresh clone for no login and SQLite. It creates the local env files and prints the keys your choices need. When you rerun setup, it updates only the two mode settings in your existing configuration. Restart both processes after changing modes.
 
-```powershell
-if (!(Test-Path .env)) { Copy-Item .env.example .env }
-if (!(Test-Path frontend/.env)) { Copy-Item frontend/.env.example frontend/.env }
+For manual setup, copy `.env.example` to `.env` and `frontend/.env.example` to `frontend/.env`, then use the settings below.
+
+### Choose login and storage
+
+Set these independently in the root `.env`. A new copy of `.env.example` starts with these personal settings:
+
+```dotenv
+AUTH_MODE=none
+DATABASE_MODE=sqlite
+SQLITE_PATH=./data/newsdesk.sqlite
 ```
 
-### Where to put your keys
-
-Edit these two local files. Paste values after the equals signs. Keep the example files blank for the next person.
-
-| Local file | Field | What to enter |
+| Choice | What to set | What happens |
 | --- | --- | --- |
-| `.env` | `MONGODB_URI` | Your Atlas connection string including a database name, or the example URI if MongoDB is running locally. |
-| `.env` | `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` | The publishable and secret keys from the same Clerk application. |
-| `.env` | `GROQ_API_KEY` | One Groq API key. Leave the extra key slots empty unless you have more. |
-| `.env` | `TELEGRAM_BOT_TOKEN` | The token BotFather gives you after `/newbot`. |
-| `.env` | `TELEGRAM_WEBHOOK_URL` | Your public HTTPS backend or tunnel address followed by `/api/telegram/webhook`. A local-only address cannot receive Telegram updates. |
-| `frontend/.env` | `VITE_CLERK_PUBLISHABLE_KEY` | The same Clerk **publishable** key as above. Frontend values are visible to visitors. |
-| `frontend/.env` | `VITE_TELEGRAM_BOT_USERNAME` | Your bot username without the leading `@`. |
-| `frontend/.env` | `VITE_API_BASE_URL` | Leave empty for local development. For deployment enter your own backend origin. |
+| No login | `AUTH_MODE=none` | One reader on this computer. The API binds to loopback. Open the dashboard on localhost. |
+| Clerk login | `AUTH_MODE=clerk` | Each signed-in reader gets their own profile and Telegram link. |
+| Local storage | `DATABASE_MODE=sqlite` | The backend creates a SQLite file on first startup. Interests, articles, Telegram links and delivery history survive browser and server restarts. |
+| MongoDB | `DATABASE_MODE=mongodb` | Set `MONGODB_URI` to your Atlas URI with a database name or to a running local MongoDB instance. |
+
+Both login choices work with either database. Existing deployments that omit both settings use Clerk and MongoDB. Switching storage opens the selected database; it does not migrate your records. Switching login changes which reader profile the dashboard opens.
+
+### Fill in your keys
+
+| Local file | Field | When and what to enter |
+| --- | --- | --- |
+| `.env` | `GROQ_API_KEY` | Always. One Groq API key for summaries. |
+| `.env` | `TELEGRAM_BOT_TOKEN` | Always. Create a dedicated bot with BotFather using `/newbot`, then paste its token here. |
+| `frontend/.env` | `VITE_TELEGRAM_BOT_USERNAME` | Always. Enter that bot’s username without `@`. |
+| `.env` | `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` | Clerk login only. Use keys from the same Clerk application. |
+| `frontend/.env` | `VITE_CLERK_PUBLISHABLE_KEY` | Clerk login only. Copy the publishable key. Keep the secret key on the backend. |
+| `.env` | `MONGODB_URI` | MongoDB only. For Atlas, give the app database access and allow connections from the backend host. |
+| `.env` | `TELEGRAM_WEBHOOK_URL` | Clerk mode. Your public HTTPS backend or tunnel URL followed by `/api/telegram/webhook`. |
 
 ### Start the app and link Telegram
 
-1. Start MongoDB locally or enter your own Atlas URI in `MONGODB_URI`. In Atlas, grant the app database access and allow connections from your backend host. First-time embedding inference downloads the model and needs outbound internet access and writable cache space.
-2. Create a Clerk application. Enable the sign-in methods you want. Put its publishable key in both local env files and its secret key only in the root file. Add your Groq key and a Telegram token from BotFather. Set the bot username in the frontend file.
-3. Use a Telegram bot dedicated to your instance. The server and registration script derive the same webhook verification secret from its token. To override it, set the same random `TELEGRAM_WEBHOOK_SECRET` on both. Register the webhook again whenever you rotate either credential.
-4. Run `npm run start:web` and, in a second terminal, `npm run dev --prefix frontend`. Check [local API health](http://localhost:3000/api/health) for a connected database. The default Vite proxy targets port 3000. Restart Vite after editing frontend settings.
-5. For bot linking and incoming commands, expose the backend through a public HTTPS deployment or tunnel. Set `TELEGRAM_WEBHOOK_URL` to its full `/api/telegram/webhook` URL. Run `node src/scripts/setTelegramWebhook.js` and then `node src/scripts/setTelegramWebhook.js --info`. Sign in, set your interests, open Delivery Channels, generate a code and follow the Telegram link. Use `npm start` for normal service startup with bot command registration.
+1. From the repository root, run `npm start`. In a second terminal run `npm run dev --prefix frontend`. Open the localhost URL Vite prints. The local API defaults to port 3000. Check [API health](http://localhost:3000/api/health) for a connected database.
+2. **No login:** Open the desk locally. The backend receives Telegram updates through outbound polling, so a new dedicated bot works without a webhook or public tunnel. Keep both the API and the Vite dev server on loopback. Use one running instance per bot.
+3. **Clerk login:** Sign in with your configured Clerk app. Expose your backend through HTTPS and run `node src/scripts/setTelegramWebhook.js`, then `node src/scripts/setTelegramWebhook.js --info`. Both the server and the script derive the verification secret from the token. If you override `TELEGRAM_WEBHOOK_SECRET`, use the same value on both.
+4. In **Delivery Channels**, generate a Telegram code and open your bot to send the start command. Save a topic in **Interests**, then send `/digest` in Telegram. First use of the embedding model needs internet access and writable cache space.
+5. For automatic editions, set `DISABLE_SCHEDULER=false` and restart the backend. Keep it running at **08:00 and 18:00 Asia/Kolkata**. The default example disables scheduling while you set up.
 
 ### Deployment
 
-Run the backend as one persistent Node process with the scheduler active. Set `FRONTEND_URL` to the exact dashboard origin and configure the root variables on the host. For Vercel, select `frontend` as the project root, use `npm run build`, publish `dist` and set `VITE_API_BASE_URL`, `VITE_CLERK_PUBLISHABLE_KEY` and `VITE_TELEGRAM_BOT_USERNAME` before building. Configure the deployed domain in Clerk and register the production bot webhook. Set `DISABLE_SCHEDULER=false` on one always-on delivery host. The local example disables scheduling. At startup and every ten minutes the service checks MongoDB for the current India-time edition and runs it if missing. A sleeping backend needs an external wake-up or an always-on host. Completed editions from prior days are skipped.
+Use Clerk for a shared or public desk. Run one persistent backend with scheduling enabled. SQLite needs a persistent disk mounted at `SQLITE_PATH`; MongoDB uses your external database. Set `FRONTEND_URL` to the dashboard origin. For Vercel, use `frontend` as the root, `npm run build` as the command and `dist` as the output. Set `VITE_AUTH_MODE=clerk`, `VITE_API_BASE_URL` to your own HTTPS backend, the Clerk publishable key and the Telegram bot username on the frontend host. Register the backend’s webhook and configure the dashboard domain in Clerk. Restart Vite or rebuild after changing login or frontend settings.
 
 ### Verification
 

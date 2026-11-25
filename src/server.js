@@ -13,11 +13,16 @@ async function startServer() {
   const app = createApp();
 
   const port = config.PORT || 3000;
-  const server = app.listen(port, () => {
+  const server = app.listen(port, config.AUTH_MODE === 'none' ? '127.0.0.1' : undefined, () => {
     console.log(`[Server] API backend running on http://localhost:${port}`);
     console.log(`[Server] Health check available at http://localhost:${port}/api/health`);
   });
 
+  if (config.AUTH_MODE === 'none') {
+    const controller = new AbortController();
+    server.once('listening', () => { void require('./services/telegramPolling').pollTelegram(controller.signal); });
+    server.once('close', () => controller.abort());
+  }
   return { app, server };
 }
 

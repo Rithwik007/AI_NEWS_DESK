@@ -7,7 +7,8 @@ import Spinner from './components/Spinner';
 
 const AccountRoutes = lazy(() => import('./AccountRoutes'));
 
-const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const personal = import.meta.env.VITE_AUTH_MODE === 'none';
+const clerkKey = !personal && import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 function Home() {
   const { isSignedIn } = useAuth();
@@ -19,7 +20,7 @@ export default function App() {
     <>
       <OfflineBanner />
       <Routes>
-        <Route path="/" element={clerkKey ? <Home /> : <FrontPage />} />
+        <Route path="/" element={personal ? <Navigate to="/desk" replace /> : clerkKey ? <Home /> : <FrontPage />} />
         <Route path="*" element={<Suspense fallback={<Spinner />}><AccountRoutes /></Suspense>} />
       </Routes>
     </>

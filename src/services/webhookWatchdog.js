@@ -175,7 +175,7 @@ async function checkWhatsAppWebhookHealth() {
 async function checkAllDeliveryWebhooks(options = {}) {
   console.log('\n[Webhook Watchdog] 🔍 Running delivery channels webhook health self-check...');
   const [telegram, whatsapp] = await Promise.all([
-    checkTelegramWebhookHealth(options),
+    config.AUTH_MODE === 'none' ? { healthy: true, skipped: true, details: { transport: 'polling' } } : checkTelegramWebhookHealth(options),
     checkWhatsAppWebhookHealth(),
   ]);
 

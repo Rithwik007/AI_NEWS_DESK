@@ -40,6 +40,7 @@ export async function apiFetch(endpoint, options = {}, getTokenFn = null) {
   const url = apiUrl(endpoint);
   const headers = new Headers(options.headers || {});
 
+  if (import.meta.env.VITE_AUTH_MODE === 'none') headers.set('X-Desk-Local', '1');
   if (!headers.has('Authorization') && getTokenFn) {
     const token = await getAuthToken(getTokenFn);
     if (token) {

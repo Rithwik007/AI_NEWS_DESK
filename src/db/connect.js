@@ -12,6 +12,7 @@ let _connectionPromise = null;
  * @returns {Promise<mongoose.Connection>}
  */
 async function connectDB() {
+  if (config.DATABASE_MODE === 'sqlite') return require('./sqlite').open();
   if (mongoose.connection.readyState === 1) {
     return mongoose.connection;
   }
@@ -48,6 +49,7 @@ async function connectDB() {
  * @returns {Promise<void>}
  */
 async function ensureDBConnected() {
+  if (config.DATABASE_MODE === 'sqlite') return require('./sqlite').open();
   if (mongoose.connection.readyState === 1) {
     return;
   }
@@ -86,6 +88,7 @@ mongoose.connection.on('error', (err) => {
  * Gracefully close MongoDB connection.
  */
 async function disconnectDB() {
+  if (config.DATABASE_MODE === 'sqlite') return require('./sqlite').close();
   closing = true;
   try {
     await mongoose.disconnect();

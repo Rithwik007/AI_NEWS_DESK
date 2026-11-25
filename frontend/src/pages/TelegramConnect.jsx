@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '../utils/deskAuth';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { apiFetch } from '../utils/api';
 import { trackEvent } from '../utils/analytics';
@@ -46,7 +46,7 @@ function parsePhoneNumber(fullPhone) {
 export default function TelegramConnect() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
-  const { setTelegramLinked, setWhatsappEligible } = useOutletContext() || {};
+  const { setTelegramLinked } = useOutletContext() || {};
 
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ linked: null, telegramChatId: null, linkedAt: null });
@@ -129,7 +129,6 @@ export default function TelegramConnect() {
       const data = await apiFetch('/api/whatsapp/status', {}, getToken);
       if (data) {
         setWaStatus(data);
-        setWhatsappEligible?.(Boolean(data.isWhatsAppEligible));
         if (request) {
           if (data.isWhatsAppEligible && data.phoneNumber === request.phoneNumber) {
             setWaSuccess(null);
@@ -152,7 +151,7 @@ export default function TelegramConnect() {
     } finally {
       setWaChecking(false);
     }
-  }, [getToken, setWhatsappEligible]);
+  }, [getToken]);
 
   useEffect(() => {
     checkStatus();
@@ -281,11 +280,11 @@ export default function TelegramConnect() {
     <div style={{ maxWidth: '680px' }}>
       <h1>Delivery Channels</h1>
       <p className="text-slate" style={{ marginBottom: '2rem' }}>
-        Connect your preferred messaging channels to receive curated AI news digests and interact with the AI assistant.
+        Link your Telegram bot to receive scheduled editions and request your latest digest.
       </p>
 
       {/* WhatsApp Channel Card */}
-      <div
+      {waStatus.available && <div
         style={{
           backgroundColor: '#FFFFFF',
           border: '1px solid var(--color-hairline)',
@@ -500,7 +499,7 @@ export default function TelegramConnect() {
             )}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Telegram Channel Card */}
       <div

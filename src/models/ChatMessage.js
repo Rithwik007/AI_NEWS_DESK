@@ -33,4 +33,4 @@ const chatMessageSchema = new mongoose.Schema({
 
 chatMessageSchema.index({ userId: 1, createdAt: -1 });
 
-module.exports = mongoose.model('ChatMessage', chatMessageSchema);
+module.exports = require('../db/model')('ChatMessage', chatMessageSchema);
